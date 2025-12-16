@@ -30,63 +30,41 @@ struct WeekCell: View {
     }
 }
 
-// Pulsating current week cell - separate view for the animation
-struct CurrentWeekCell: View {
-    let cellSize: CGFloat
-
-    @State private var scale: CGFloat = 1.0
-
-    var body: some View {
-        Circle()
-            .fill(Color.gridFilled)
-            .frame(width: cellSize, height: cellSize)
-            .scaleEffect(scale)
-            .onAppear {
-                withAnimation(
-                    .easeInOut(duration: 0.8)
-                    .repeatForever(autoreverses: true)
-                ) {
-                    scale = 1.4
-                }
-            }
-    }
-}
-
-// Ripple effect overlay for current week
+// Current week pulse overlay - per CRAFT_SPEC: scale 1.0→1.08, 2.0s duration
 struct PulsingCurrentWeekOverlay: View {
     let cellSize: CGFloat
     let position: CGPoint
 
     @State private var scale: CGFloat = 1.0
-    @State private var opacity: Double = 0.6
 
     var body: some View {
         Circle()
-            .stroke(Color.primary.opacity(opacity), lineWidth: 1)
+            .fill(Color.weekCurrent)
             .frame(width: cellSize, height: cellSize)
             .scaleEffect(scale)
             .position(position)
             .onAppear {
                 withAnimation(
-                    .easeOut(duration: 1.5)
-                    .repeatForever(autoreverses: false)
+                    .easeInOut(duration: 2.0)
+                    .repeatForever(autoreverses: true)
                 ) {
-                    scale = 3.0
-                    opacity = 0.0
+                    scale = 1.08
                 }
             }
     }
 }
 
 #Preview {
-    HStack(spacing: 8) {
-        WeekCell(weekNumber: 1, isLived: true, isCurrentWeek: false, rating: nil, isRevealed: true)
-            .frame(width: 10, height: 10)
-        WeekCell(weekNumber: 2, isLived: true, isCurrentWeek: false, rating: 5, isRevealed: true)
-            .frame(width: 10, height: 10)
-        CurrentWeekCell(cellSize: 10)
-        WeekCell(weekNumber: 4, isLived: false, isCurrentWeek: false, rating: nil, isRevealed: true)
-            .frame(width: 10, height: 10)
+    ZStack {
+        Color.bgPrimary
+        HStack(spacing: 8) {
+            WeekCell(weekNumber: 1, isLived: true, isCurrentWeek: false, rating: nil, isRevealed: true)
+                .frame(width: 10, height: 10)
+            WeekCell(weekNumber: 2, isLived: true, isCurrentWeek: false, rating: 5, isRevealed: true)
+                .frame(width: 10, height: 10)
+            PulsingCurrentWeekOverlay(cellSize: 10, position: CGPoint(x: 50, y: 50))
+            WeekCell(weekNumber: 4, isLived: false, isCurrentWeek: false, rating: nil, isRevealed: true)
+                .frame(width: 10, height: 10)
+        }
     }
-    .padding()
 }

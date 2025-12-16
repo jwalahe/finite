@@ -11,6 +11,7 @@ import SwiftData
 struct OnboardingView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = OnboardingViewModel()
+    @State private var isButtonPressed = false
 
     var onComplete: (User) -> Void
 
@@ -23,18 +24,19 @@ struct OnboardingView: View {
                 Text("Finite")
                     .font(.system(size: 48, weight: .light, design: .default))
                     .tracking(2)
+                    .foregroundStyle(Color.textPrimary)
 
                 Text("Your life in weeks.")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textSecondary)
             }
-            .padding(.bottom, 60)
+            .padding(.bottom, 64) // 8pt multiple
 
             // Birthday picker
-            VStack(spacing: 16) {
+            VStack(spacing: 16) { // 8pt multiple
                 Text("When were you born?")
                     .font(.headline)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.textPrimary)
 
                 DatePicker(
                     "",
@@ -57,33 +59,47 @@ struct OnboardingView: View {
                 VStack(spacing: 4) {
                     Text("\(viewModel.previewWeeksLived.formatted()) weeks lived")
                         .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Color.textTertiary)
                     Text("\(viewModel.previewWeeksRemaining.formatted()) weeks remaining")
                         .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Color.textTertiary)
                 }
-                .padding(.bottom, 24)
+                .padding(.bottom, 24) // 8pt multiple
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
-            // Continue button
+            // Continue button - CRAFT_SPEC: scale 0.96x on press, haptic on tap
             Button {
-                HapticService.shared.medium()
+                HapticService.shared.light()
                 let user = viewModel.createUser(in: modelContext)
                 onComplete(user)
             } label: {
                 Text("See Your Life")
                     .font(.headline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.bgPrimary)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.primary)
+                    .padding(.vertical, 16) // 8pt multiple
+                    .background(Color.textPrimary)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 48)
+            .scaleEffect(isButtonPressed ? 0.96 : 1.0)
+            .animation(.snappy(duration: 0.12), value: isButtonPressed)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        if !isButtonPressed {
+                            isButtonPressed = true
+                            HapticService.shared.light()
+                        }
+                    }
+                    .onEnded { _ in
+                        isButtonPressed = false
+                    }
+            )
+            .padding(.horizontal, 24) // CRAFT_SPEC: 24pt screen margins
+            .padding(.bottom, 48) // 8pt multiple
         }
-        .background(Color.finiteBackground)
+        .background(Color.bgPrimary)
         .animation(.easeInOut(duration: 0.3), value: viewModel.isDateSelected)
     }
 }

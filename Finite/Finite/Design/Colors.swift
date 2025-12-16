@@ -8,13 +8,13 @@
 import SwiftUI
 
 extension Color {
-    // MARK: - Spectrum Rating Colors
+    // MARK: - Spectrum Rating Colors (from CRAFT_SPEC)
 
-    static let ratingAwful = Color(red: 0.76, green: 0.22, blue: 0.22)      // Deep Red
-    static let ratingHard = Color(red: 0.85, green: 0.45, blue: 0.25)       // Orange-Red
-    static let ratingOkay = Color(red: 0.78, green: 0.68, blue: 0.35)       // Amber
-    static let ratingGood = Color(red: 0.45, green: 0.70, blue: 0.45)       // Soft Green
-    static let ratingGreat = Color(red: 0.22, green: 0.55, blue: 0.35)      // Deep Green
+    static let ratingAwful = Color(hex: 0xDC2626)  // Deep red
+    static let ratingHard = Color(hex: 0xEA580C)   // Orange
+    static let ratingOkay = Color(hex: 0xD97706)   // Amber
+    static let ratingGood = Color(hex: 0x65A30D)   // Soft green
+    static let ratingGreat = Color(hex: 0x16A34A)  // Deep green
 
     static func ratingColor(for rating: Int) -> Color {
         switch rating {
@@ -27,15 +27,58 @@ extension Color {
         }
     }
 
-    // MARK: - UI Colors
+    // MARK: - Background Colors (from CRAFT_SPEC)
 
-    static let gridUnfilled = Color(.systemGray5)
-    static let gridFilled = Color(.systemGray3)
-    static let gridFilledBW = Color(.systemGray2)
+    static let bgPrimary = Color(light: Color(hex: 0xFAFAFA), dark: Color(hex: 0x0A0A0A))
+    static let bgSecondary = Color(light: Color(hex: 0xF5F5F5), dark: Color(hex: 0x1C1C1E))
+    static let bgTertiary = Color(light: Color(hex: 0xEFEFEF), dark: Color(hex: 0x2C2C2E))
 
-    // MARK: - Semantic Colors
+    // MARK: - Text Colors (from CRAFT_SPEC)
 
-    static let finiteBackground = Color(.systemBackground)
-    static let finiteText = Color(.label)
-    static let finiteSecondaryText = Color(.secondaryLabel)
+    static let textPrimary = Color(light: Color(hex: 0x1A1A1A), dark: Color(hex: 0xF5F5F5))
+    static let textSecondary = Color(light: Color(hex: 0x6B6B6B), dark: Color(hex: 0x8E8E93))
+    static let textTertiary = Color(light: Color(hex: 0x9A9A9A), dark: Color(hex: 0x636366))
+
+    // MARK: - Grid Colors (B&W Mode - from CRAFT_SPEC)
+
+    static let weekEmpty = Color(light: Color(hex: 0xE0E0E0), dark: Color(hex: 0x3A3A3A))
+    static let weekFilled = Color(light: Color(hex: 0x2A2A2A), dark: Color(hex: 0xE5E5E5))
+    static let weekCurrent = Color(light: Color(hex: 0x1A1A1A), dark: Color(hex: 0xFFFFFF))
+
+    // MARK: - Border Color
+
+    static let border = Color(light: Color(hex: 0xE5E5E5), dark: Color(hex: 0x38383A))
+
+    // MARK: - Legacy (for compatibility)
+
+    static let gridUnfilled = weekEmpty
+    static let gridFilled = weekFilled
+    static let finiteBackground = bgPrimary
+    static let finiteText = textPrimary
+    static let finiteSecondaryText = textSecondary
+}
+
+// MARK: - Color Hex Initializer
+
+extension Color {
+    init(hex: UInt, alpha: Double = 1.0) {
+        self.init(
+            .sRGB,
+            red: Double((hex >> 16) & 0xFF) / 255.0,
+            green: Double((hex >> 8) & 0xFF) / 255.0,
+            blue: Double(hex & 0xFF) / 255.0,
+            opacity: alpha
+        )
+    }
+
+    init(light: Color, dark: Color) {
+        self.init(uiColor: UIColor { traitCollection in
+            switch traitCollection.userInterfaceStyle {
+            case .dark:
+                return UIColor(dark)
+            default:
+                return UIColor(light)
+            }
+        })
+    }
 }
