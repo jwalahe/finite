@@ -38,14 +38,28 @@ final class NotificationService {
     // MARK: - Daily Notification
 
     /// Schedule daily notification at specified time
-    /// PRD: Body text is raw number only (e.g., "2,647")
+    /// Behavioral design: Rotate through nudges to prevent habituation
     func scheduleDailyNotification(weeksRemaining: Int, at time: Date) {
         // Cancel existing daily notification
         cancelDailyNotification()
 
-        // Create content - just the number, no title per PRD
+        // Create content with memento mori nudge
         let content = UNMutableNotificationContent()
-        content.body = weeksRemaining.formatted()
+
+        // Rotating nudges based on day of week - prevents habituation
+        let nudges = [
+            "\(weeksRemaining.formatted()) weeks. Make this one count.",
+            "\(weeksRemaining.formatted()) weeks remain. What matters today?",
+            "\(weeksRemaining.formatted()) weeks left. Live deliberately.",
+            "\(weeksRemaining.formatted()) weeks. Time is finite.",
+            "\(weeksRemaining.formatted()) weeks remaining. Mark your week.",
+            "\(weeksRemaining.formatted()) weeks. Don't sleepwalk through today.",
+            "\(weeksRemaining.formatted()) weeks left. What will you do with them?"
+        ]
+
+        // Use day of week to rotate (0-6)
+        let dayOfWeek = Calendar.current.component(.weekday, from: Date()) - 1
+        content.body = nudges[dayOfWeek % nudges.count]
         content.sound = .default
 
         // Extract hour and minute from the time

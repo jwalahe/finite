@@ -20,6 +20,9 @@ final class User {
     var colorModeEnabled: Bool
     var lifeExpectancy: Int
 
+    // State tracking
+    var hasSeenReveal: Bool
+
     init(birthDate: Date) {
         self.birthDate = birthDate
         self.createdAt = Date()
@@ -28,6 +31,7 @@ final class User {
         self.dailyNotificationTime = Calendar.current.date(from: DateComponents(hour: 8, minute: 0)) ?? Date()
         self.colorModeEnabled = true
         self.lifeExpectancy = 80
+        self.hasSeenReveal = false
     }
 
     // MARK: - Computed Properties

@@ -13,8 +13,6 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Query private var users: [User]
 
-    @State private var hasCompletedOnboarding = false
-    @State private var currentUser: User?
     @State private var isUnlocked = false
     @State private var needsLock = false
 
@@ -27,25 +25,21 @@ struct ContentView: View {
                         isUnlocked = true
                     }
                 }
-            } else if hasCompletedOnboarding, let user = currentUser {
-                // Just completed onboarding - show grid WITH reveal animation
-                GridView(user: user, shouldReveal: true)
-                    .onAppear {
-                        syncWidgetData(for: user)
-                        setupNotifications(for: user)
-                    }
             } else if let user = users.first {
-                // Returning user - show grid without reveal animation
-                GridView(user: user, shouldReveal: false)
+                // Existing user - only reveal if they haven't seen it yet
+                let shouldReveal = !user.hasSeenReveal
+                GridView(user: user, shouldReveal: shouldReveal)
                     .onAppear {
+                        // Mark reveal as seen after showing
+                        if shouldReveal {
+                            user.hasSeenReveal = true
+                        }
                         syncWidgetData(for: user)
                         setupNotifications(for: user)
                     }
             } else {
                 // No user - show onboarding
                 OnboardingView { user in
-                    currentUser = user
-                    hasCompletedOnboarding = true
                     syncWidgetData(for: user)
                     setupNotifications(for: user)
                 }
