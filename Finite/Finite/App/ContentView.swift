@@ -10,28 +10,59 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @Query private var users: [User]
 
     @State private var hasCompletedOnboarding = false
     @State private var currentUser: User?
+    @State private var isUnlocked = false
+    @State private var needsLock = false
 
     var body: some View {
         Group {
-            if hasCompletedOnboarding, let user = currentUser {
+            if let user = users.first, user.biometricLockEnabled, !isUnlocked, needsLock {
+                // Show lock screen for returning user with biometric enabled
+                LockScreen {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        isUnlocked = true
+                    }
+                }
+            } else if hasCompletedOnboarding, let user = currentUser {
                 // Just completed onboarding - show grid WITH reveal animation
-                // This must be checked FIRST because @Query updates immediately
                 GridView(user: user, shouldReveal: true)
-                    .onAppear { syncWidgetData(for: user) }
+                    .onAppear {
+                        syncWidgetData(for: user)
+                        setupNotifications(for: user)
+                    }
             } else if let user = users.first {
                 // Returning user - show grid without reveal animation
                 GridView(user: user, shouldReveal: false)
-                    .onAppear { syncWidgetData(for: user) }
+                    .onAppear {
+                        syncWidgetData(for: user)
+                        setupNotifications(for: user)
+                    }
             } else {
                 // No user - show onboarding
                 OnboardingView { user in
                     currentUser = user
                     hasCompletedOnboarding = true
                     syncWidgetData(for: user)
+                    setupNotifications(for: user)
+                }
+            }
+        }
+        .onAppear {
+            // Check if we need lock on initial appear
+            if let user = users.first, user.biometricLockEnabled {
+                needsLock = true
+            }
+        }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            // Re-lock when app goes to background
+            if newPhase == .background {
+                if let user = users.first, user.biometricLockEnabled {
+                    isUnlocked = false
+                    needsLock = true
                 }
             }
         }
@@ -40,6 +71,23 @@ struct ContentView: View {
     /// Sync user data to widget via App Group UserDefaults
     private func syncWidgetData(for user: User) {
         WidgetDataProvider.shared.updateWidgetData(from: user)
+    }
+
+    /// Setup notifications for the user
+    private func setupNotifications(for user: User) {
+        // Schedule daily notification if enabled
+        NotificationService.shared.updateDailyNotification(
+            enabled: user.dailyNotificationEnabled,
+            weeksRemaining: user.weeksRemaining,
+            at: user.dailyNotificationTime
+        )
+
+        // Schedule milestone notifications
+        NotificationService.shared.scheduleUpcomingMilestones(
+            birthDate: user.birthDate,
+            currentAge: user.yearsLived,
+            lifeExpectancy: user.lifeExpectancy
+        )
     }
 }
 

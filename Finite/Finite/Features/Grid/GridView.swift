@@ -41,6 +41,9 @@ struct GridView: View {
     @State private var bloomProgress: CGFloat = 0.0
     @State private var isBloomAnimating: Bool = false
 
+    // Settings sheet
+    @State private var showSettings: Bool = false
+
     private let weeksPerRow: Int = 52
     private let revealDuration: Double = 2.0
     // CRAFT_SPEC: Screen margins 24pt
@@ -181,6 +184,9 @@ struct GridView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView(user: user)
         }
     }
 
@@ -460,9 +466,24 @@ struct GridView: View {
 
     private var headerView: some View {
         HStack {
-            // Spacer for balance
-            Color.clear
-                .frame(width: 44, height: 44)
+            // Settings button
+            if hasRevealCompleted {
+                Button {
+                    HapticService.shared.light()
+                    showSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Color.textTertiary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .transition(.opacity)
+            } else {
+                Color.clear
+                    .frame(width: 44, height: 44)
+            }
 
             Spacer()
 
