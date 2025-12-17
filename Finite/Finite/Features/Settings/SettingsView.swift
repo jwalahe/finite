@@ -12,13 +12,11 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     // Local state for toggles (synced to user model)
-    @State private var biometricEnabled: Bool
     @State private var notificationsEnabled: Bool
     @State private var notificationTime: Date
 
     init(user: User) {
         self.user = user
-        _biometricEnabled = State(initialValue: user.biometricLockEnabled)
         _notificationsEnabled = State(initialValue: user.dailyNotificationEnabled)
         _notificationTime = State(initialValue: user.dailyNotificationTime)
     }
@@ -26,25 +24,6 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                // Security Section
-                Section {
-                    Toggle(isOn: $biometricEnabled) {
-                        Label {
-                            Text(BiometricService.shared.biometricName)
-                        } icon: {
-                            Image(systemName: biometricIcon)
-                        }
-                    }
-                    .onChange(of: biometricEnabled) { _, newValue in
-                        user.biometricLockEnabled = newValue
-                        HapticService.shared.light()
-                    }
-                } header: {
-                    Text("Security")
-                } footer: {
-                    Text("Require \(BiometricService.shared.biometricName) to open Finite")
-                }
-
                 // Notifications Section
                 Section {
                     Toggle(isOn: $notificationsEnabled) {
@@ -136,17 +115,6 @@ struct SettingsView: View {
     }
 
     // MARK: - Helpers
-
-    private var biometricIcon: String {
-        switch BiometricService.shared.biometricType {
-        case .faceID:
-            return "faceid"
-        case .touchID:
-            return "touchid"
-        case .none:
-            return "lock.fill"
-        }
-    }
 
     private var appVersion: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"

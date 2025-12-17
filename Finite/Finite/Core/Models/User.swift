@@ -14,7 +14,6 @@ final class User {
     var createdAt: Date
 
     // Settings
-    var biometricLockEnabled: Bool
     var dailyNotificationEnabled: Bool
     var dailyNotificationTime: Date
     var colorModeEnabled: Bool
@@ -26,7 +25,6 @@ final class User {
     init(birthDate: Date) {
         self.birthDate = birthDate
         self.createdAt = Date()
-        self.biometricLockEnabled = true
         self.dailyNotificationEnabled = true
         self.dailyNotificationTime = Calendar.current.date(from: DateComponents(hour: 8, minute: 0)) ?? Date()
         self.colorModeEnabled = true

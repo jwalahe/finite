@@ -10,53 +10,39 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.scenePhase) private var scenePhase
     @Query private var users: [User]
 
-    @State private var isUnlocked = false
-    @State private var needsLock = false
+    @State private var shouldShowReveal: Bool? = nil  // nil = not determined yet
 
     var body: some View {
         Group {
-            if let user = users.first, user.biometricLockEnabled, !isUnlocked, needsLock {
-                // Show lock screen for returning user with biometric enabled
-                LockScreen {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        isUnlocked = true
-                    }
-                }
-            } else if let user = users.first {
-                // Existing user - only reveal if they haven't seen it yet
-                let shouldReveal = !user.hasSeenReveal
-                GridView(user: user, shouldReveal: shouldReveal)
+            if let user = users.first {
+                // Existing user - use cached shouldShowReveal state
+                GridView(user: user, shouldReveal: shouldShowReveal ?? false)
                     .onAppear {
-                        // Mark reveal as seen after showing
-                        if shouldReveal {
-                            user.hasSeenReveal = true
-                        }
                         syncWidgetData(for: user)
                         setupNotifications(for: user)
                     }
             } else {
                 // No user - show onboarding
                 OnboardingView { user in
+                    // New user just completed onboarding - they should see reveal
+                    shouldShowReveal = true
                     syncWidgetData(for: user)
                     setupNotifications(for: user)
                 }
             }
         }
         .onAppear {
-            // Check if we need lock on initial appear
-            if let user = users.first, user.biometricLockEnabled {
-                needsLock = true
-            }
-        }
-        .onChange(of: scenePhase) { oldPhase, newPhase in
-            // Re-lock when app goes to background
-            if newPhase == .background {
-                if let user = users.first, user.biometricLockEnabled {
-                    isUnlocked = false
-                    needsLock = true
+            // Determine reveal state once on initial appear
+            if let user = users.first {
+                if shouldShowReveal == nil {
+                    // First time checking - use persisted value
+                    shouldShowReveal = !user.hasSeenReveal
+                    // Mark as seen immediately so it won't show again
+                    if !user.hasSeenReveal {
+                        user.hasSeenReveal = true
+                    }
                 }
             }
         }
