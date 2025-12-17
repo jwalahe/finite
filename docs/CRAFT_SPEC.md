@@ -53,6 +53,11 @@ This document translates design intent into precise technical specifications. Us
 | Current week pulse | 2.0s | — | `.easeInOut` | Scale 1.0 → 1.08 → 1.0, repeat |
 | View mode swipe | 0.2s | 0 | `.easeOut` | Crossfade between color schemes |
 | Mode label flash | 0.8s | 0 | `.easeOut` | Appear, hold, fade |
+| Ghost number summon | 0.2s | 0 | `.easeOut` | 8% → 100% opacity |
+| Ghost number fade | 0.3s | 0 | `.easeOut` | 100% → 8% opacity |
+| Breathing Aura shift | 0.5s | 0 | `.easeInOut` | Phase color transition |
+| Spine label appear | 0.15s | 0.1 | `.snappy` | Scale + fade in |
+| Spine label dismiss | 0.2s | 0 | `.easeOut` | Fade out |
 | Spectrum slider thumb | 0.1s | 0.2 | `.snappy` | Snap to notch |
 | Modal present | 0.3s | 0.1 | `.smooth` | Slide up from bottom |
 | Year wheel scroll | — | 0.15 | `.smooth` | Native picker feel |
@@ -135,6 +140,8 @@ T+31.5s:    Phase prompt modal slides up
 | View mode swipe | Impact | `.light` | On mode change |
 | Year wheel tick | Selection | — | On year change |
 | Phase add confirm | Impact | `.medium` | On "Add Chapter" |
+| Time Spine tap | Impact | `.light` | On phase tap |
+| Ghost number summon | Impact | `.light` | On tap to reveal |
 | Error | Notification | `.error` | On validation fail |
 
 ### Implementation
@@ -339,6 +346,130 @@ Inactive dot: text-tertiary color
 Position: Bottom center of grid, 16pt above safe area
 Transition: Crossfade 0.2s when mode changes
 ```
+
+### Time Spine (Chapters View Only)
+
+```
+┌──┬──────────────────────────────────┐
+│██│  Grid                            │
+│██│                                  │  ← Childhood (warm gray)
+│▓▓│                                  │
+│▓▓│                                  │  ← College (indigo)
+│▓▓│                                  │
+│░░│                                  │  ← Career (teal)
+│░░│◉                                 │  ← Current position
+│  │                                  │  ← Future (empty)
+└──┴──────────────────────────────────┘
+
+Visual width: 12pt
+Tap target width: 44pt (extends invisibly into grid area)
+Position: Left edge, full height of grid
+Segments: Proportionally sized to phase duration in weeks
+
+Colors: Match phase colors from Phase Colors palette
+Current position marker: Small notch or line indicating current week
+Future area: bg-tertiary or empty
+
+Interaction:
+- Tap anywhere on spine (44pt zone)
+- Floating label appears next to tap point:
+  ┌─────────────────┐
+  │ College         │
+  │ 2014-2018       │
+  └─────────────────┘
+- Label: bg-secondary background, 8pt padding, 6pt corner radius
+- Phase name: body-emphasis
+- Date range: caption, text-secondary
+- Dismiss: after 2s, or on next tap, or on scroll
+- Haptic: .light on tap
+```
+
+### Breathing Aura (Chapters View Only)
+
+```
+┌─────────────────────────────────────────┐
+│ ░░░                               ░░░   │  ← Subtle edge glow
+│ ░░                                 ░░   │
+│ ░                                   ░   │
+│                                         │
+│              [Grid]                     │
+│                                         │
+│ ░                                   ░   │
+│ ░░                                 ░░   │
+│ ░░░                               ░░░   │
+└─────────────────────────────────────────┘
+
+Effect: Radial gradient at screen edges
+Color: Current phase color at 15% opacity
+Radius: 80pt from each edge
+Blend mode: Normal (or Soft Light for subtlety)
+
+Behavior:
+- Color shifts as user scrolls through different phases
+- Transition: 0.5s ease-in-out when phase changes
+- Should feel ambient, not attention-grabbing
+```
+
+### Ghost Number (Focus View Only)
+
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│              [Grid]                     │
+│                                         │
+│                                         │
+│              2,647                      │  ← 8% opacity (ghost state)
+│                                         │
+│              ● ○ ○                      │
+└─────────────────────────────────────────┘
+
+Default state:
+- Number: weeks remaining
+- Font: title-lg (34pt Bold)
+- Color: text-primary at 8% opacity
+- Position: Centered, above dot indicator
+
+Summoned state (after tap):
+- Opacity animates: 8% → 100% over 0.2s
+- Holds at 100% for 2s
+- Fades: 100% → 8% over 0.3s
+- Haptic: .light on summon
+
+Interaction:
+- Tap anywhere on empty grid space (not on weeks)
+- Tap target: Full grid area excluding week cells
+
+Animation implementation:
+```swift
+// Ghost number state
+@State private var numberOpacity: Double = 0.08
+
+// Tap gesture on grid background
+.onTapGesture {
+    summonNumber()
+}
+
+func summonNumber() {
+    lightImpact.impactOccurred()
+    withAnimation(.easeOut(duration: 0.2)) {
+        numberOpacity = 1.0
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+        withAnimation(.easeOut(duration: 0.3)) {
+            numberOpacity = 0.08
+        }
+    }
+}
+```
+```
+
+### Footer by View Mode (Summary)
+
+| View | Left Edge | Footer Center | Behavior |
+|------|-----------|---------------|----------|
+| Chapters | Time Spine (12pt) | Dot indicator | Breathing Aura on edges |
+| Quality | None | "Edit this week" + Dot indicator | Standard action footer |
+| Focus | None | Ghost number + Dot indicator | Tap to summon number |
 
 ### View Mode Label (Flash)
 
@@ -619,6 +750,17 @@ The swipe between view modes reinforces the philosophical core.
 - Focus mode strips away color — just you and the countdown
 - No labels needed on grid — the mode tells the story
 
+**Each view has its own personality:**
+- **Chapters:** Time Spine + Breathing Aura — your life as colored story
+- **Quality:** Edit button — active reflection mode
+- **Focus:** Ghost number — mortality lurks, summon it when ready
+
+### Quaternary Signature: The Ghost Number
+
+The remaining weeks are always present at 8% opacity. Subliminal. You feel it more than see it. Tap to confront it directly—it rises, holds, then recedes back into the background.
+
+*The truth is always there. You choose when to look.*
+
 ### What Finite Will NOT Do
 
 - No streaks (trivializes reflection)
@@ -689,6 +831,18 @@ Before any PR, verify:
 - [ ] Mode label flashes and fades correctly
 - [ ] First-time hint shows once only
 
+### Footer System
+- [ ] Time Spine visible only in Chapters view
+- [ ] Spine tap target is 44pt despite 12pt visual
+- [ ] Spine label appears on tap, dismisses after 2s
+- [ ] Breathing Aura visible only in Chapters view
+- [ ] Aura color shifts when scrolling through phases
+- [ ] "Edit this week" button visible only in Quality view
+- [ ] Ghost number visible only in Focus view
+- [ ] Ghost number at 8% opacity by default
+- [ ] Tap summons ghost number to 100%, fades back
+- [ ] Light haptic on ghost number summon
+
 ---
 
 ## 11. Files to Add to Repository
@@ -700,15 +854,18 @@ finite-ios/
 ├── docs/
 │   ├── PRD.md                    # Product requirements
 │   ├── CRAFT_SPEC.md             # This document
+│   ├── APPLE_INTELLIGENCE_SPEC.md # V1.5 AI integration spec
 │   ├── DESIGN_PROMPTS.md         # Gemini prompts for mockups
 │   └── designs/                  # Generated mockups
 │       ├── 01-onboarding.png
 │       ├── 02-grid-reveal.png
 │       ├── 03-phase-prompt.png
 │       ├── 04-phase-builder.png
-│       ├── 05-grid-chapters.png
-│       ├── 06-grid-quality.png
-│       ├── 07-grid-focus.png
+│       ├── 05-grid-chapters.png       # With Time Spine + Breathing Aura
+│       ├── 06-grid-chapters-label.png # Spine tapped, label visible
+│       ├── 07-grid-quality.png        # With Edit button
+│       ├── 08-grid-focus.png          # Ghost number at 8%
+│       ├── 09-grid-focus-summoned.png # Ghost number at 100%
 │       └── ...
 ```
 

@@ -215,6 +215,31 @@ Acceptance Criteria:
 - Dot indicator shows current mode (● ○ ○)
 - Mode name flashes briefly on switch (e.g., "Quality")
 - First-time hint: "← Swipe to change view →" (fades after 3s, shown once)
+- Each view has distinct footer/chrome behavior (see US-011)
+```
+
+```
+US-011: As a user, I want each view mode to have contextually appropriate chrome so the interface adapts to the lens I'm using.
+
+Acceptance Criteria:
+
+CHAPTERS VIEW:
+- Time Spine: Vertical strip on left edge (12pt visual, 44pt tap target)
+- Spine shows phase colors proportionally mapped to lifespan
+- Tap any spine segment → floating label with phase name + date range (dismisses after 2s)
+- Breathing Aura: Screen edges glow subtly with current phase color (based on scroll position)
+- No "Edit this week" button
+
+QUALITY VIEW:
+- "Edit this week" button in footer
+- Tapping opens week marking bottom sheet
+- No Time Spine, no Breathing Aura
+
+FOCUS VIEW:
+- Ghost number: weeks remaining at 8% opacity (barely visible, subliminal)
+- Tap anywhere on empty space → number rises to 100% opacity, holds 2s, fades back to 8%
+- Light haptic (.light) on summon
+- Maximum starkness: no spine, no aura, no buttons
 ```
 
 #### Weekly Marking
@@ -817,6 +842,11 @@ Finite/
 | Apple Intelligence Integration | High | On-device "Reflect" feature using Foundation Models framework. Query life data, generate insights. iOS 26+, iPhone 15 Pro+ only. See APPLE_INTELLIGENCE_SPEC.md when ready to build. |
 | Export | Low | Export grid as image |
 
+### v1.6 (Journey Update)
+| Feature | Priority | Notes |
+|---------|----------|-------|
+| Journey View | High | 4th view mode. Time Spine expands to ~30% width with phase labels and date ranges. Grid shrinks. Dedicated "zoomed out" narrative view of life chapters. |
+
 ### v2.0 (Future)
 | Feature | Priority | Notes |
 |---------|----------|-------|
@@ -882,6 +912,11 @@ Finite/
 | 2024-12-17 | Phase colors auto-assigned | Zero friction, editable later for power users | PM |
 | 2024-12-17 | Apple Intelligence → V1.5 | MVP scope risk, device limitations, need user data first | PM |
 | 2024-12-17 | Face ID removed from scope | iOS has native app lock, unnecessary complexity | PM |
+| 2024-12-17 | Footer system per view mode | Chapters: Time Spine + Aura. Quality: Edit button. Focus: Ghost number. | PM |
+| 2024-12-17 | Time Spine dimensions | 12pt visual, 44pt tap target—minimal but usable | PM |
+| 2024-12-17 | Ghost number interaction | 8% opacity default, tap to summon 100% for 2s | PM |
+| 2024-12-17 | Week navigation slider removed | Obsolete—grid shows all weeks at once | PM |
+| 2024-12-17 | Journey view added to V1.6 | 4th view with expanded spine and phase labels | PM |
 
 ---
 

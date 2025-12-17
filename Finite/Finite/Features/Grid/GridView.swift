@@ -59,6 +59,18 @@ struct GridView: View {
     // Mode label flash
     @State private var showModeLabel: Bool = false
 
+    // First-time swipe hint
+    @State private var showSwipeHint: Bool = false
+
+    // Breathing Aura - current phase color based on scroll position
+    @State private var currentAuraColor: Color = .clear
+
+    // Spine phase label state (rendered as overlay to appear above grid)
+    @State private var spineLabelPhase: LifePhase?
+    @State private var spineLabelY: CGFloat = 0
+    @State private var showSpineLabel: Bool = false
+    @State private var spineLabelDismissTask: Task<Void, Never>?
+
     private let weeksPerRow: Int = 52
     private let revealDuration: Double = 2.0
     // CRAFT_SPEC: Screen margins 24pt
@@ -199,9 +211,9 @@ struct GridView: View {
                             gridHeight: gridHeight
                         )
 
-                        // "Mark This Week" button
+                        // View mode specific content
                         if hasRevealCompleted && !isScrubbing {
-                            markCurrentWeekButton
+                            viewModeFooterContent
                                 .padding(.top, 24)
                                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
                         }
@@ -216,6 +228,18 @@ struct GridView: View {
                 // Mode label flash + Dot indicator
                 if hasRevealCompleted {
                     VStack(spacing: 8) {
+                        // First-time swipe hint (shown once)
+                        if showSwipeHint {
+                            Text("← Swipe to change view →")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(Color.textSecondary)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.bgSecondary.opacity(0.9))
+                                .cornerRadius(8)
+                                .transition(.opacity)
+                        }
+
                         // Mode label (flashes on change)
                         if showModeLabel {
                             Text(currentViewMode.displayName)
@@ -254,6 +278,25 @@ struct GridView: View {
                     .padding(.bottom, geometry.safeAreaInsets.bottom > 0 ? 0 : 16)
                 }
             }
+
+            // Breathing Aura (Chapters view only) - CRAFT_SPEC: Screen edge glow with phase color
+            if currentViewMode == .chapters && hasRevealCompleted && !phases.isEmpty {
+                BreathingAura(phaseColor: currentAuraColor)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+            }
+
+            // Spine phase label overlay (renders above grid)
+            if showSpineLabel, let phase = spineLabelPhase {
+                SpinePhaseLabel(
+                    phase: phase,
+                    yPosition: spineLabelY,
+                    gridHeight: CGFloat(user.lifeExpectancy) * 10 // Approximate row height
+                )
+                .padding(.top, 100) // Offset for header
+                .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .leading)))
+                .zIndex(100)
+            }
         }
         .background(Color.bgPrimary)
         .onAppear {
@@ -269,6 +312,8 @@ struct GridView: View {
             currentViewMode = user.currentViewMode
             // Build grid colors cache
             rebuildGridColorsCache()
+            // Set initial aura color
+            updateAuraColor()
         }
         .onChange(of: weeks.count) { _, _ in
             // Rebuild cache when weeks change (new week marked)
@@ -276,9 +321,16 @@ struct GridView: View {
             rebuildGridColorsCache()
         }
         .onChange(of: phases.count) { _, _ in
-            // Rebuild phase cache when phases change
+            // Rebuild phase cache when phases added/deleted
             rebuildPhaseColorsCache()
             rebuildGridColorsCache()
+            updateAuraColor()
+        }
+        .onChange(of: phases.map { "\($0.startYear)-\($0.endYear)-\($0.colorHex)" }) { _, _ in
+            // Rebuild cache when any phase is edited (years or color changed)
+            rebuildPhaseColorsCache()
+            rebuildGridColorsCache()
+            updateAuraColor()
         }
         .sheet(item: $selectedWeekForDetail) { weekId in
             let weekNumberToCheck = weekId.value
@@ -338,20 +390,30 @@ struct GridView: View {
         let showCurrentAge = distanceToDecade > 2
 
         return HStack(alignment: .top, spacing: 0) {
-            // Left age labels
-            VStack(alignment: .trailing, spacing: 0) {
-                ForEach(0..<user.lifeExpectancy, id: \.self) { year in
-                    let isDecadeMark = year == 0 || year % 10 == 0
-                    let isCurrentAge = year == currentAge && showCurrentAge
-                    let showLabel = isDecadeMark || isCurrentAge
-
-                    Text(showLabel ? "\(year)" : "")
-                        .font(.system(size: 9, weight: .medium, design: .rounded))
-                        .foregroundStyle(year == currentAge ? Color.textPrimary : Color.textTertiary)
-                        .frame(width: ageLabelWidth, height: rowHeight, alignment: .trailing)
+            // Time Spine (Chapters view only) - CRAFT_SPEC: 12pt visual, 44pt tap target
+            if currentViewMode == .chapters && hasRevealCompleted && !phases.isEmpty {
+                TimeSpine(user: user, phases: phases, gridHeight: gridHeight) { phase, yPos in
+                    handleSpineTap(phase: phase, yPosition: yPos)
                 }
+                .transition(.opacity.combined(with: .move(edge: .leading)))
             }
-            .padding(.trailing, 6)
+
+            // Left age labels (hide when spine is showing to save space)
+            if currentViewMode != .chapters || phases.isEmpty {
+                VStack(alignment: .trailing, spacing: 0) {
+                    ForEach(0..<user.lifeExpectancy, id: \.self) { year in
+                        let isDecadeMark = year == 0 || year % 10 == 0
+                        let isCurrentAge = year == currentAge && showCurrentAge
+                        let showLabel = isDecadeMark || isCurrentAge
+
+                        Text(showLabel ? "\(year)" : "")
+                            .font(.system(size: 9, weight: .medium, design: .rounded))
+                            .foregroundStyle(year == currentAge ? Color.textPrimary : Color.textTertiary)
+                            .frame(width: ageLabelWidth, height: rowHeight, alignment: .trailing)
+                    }
+                }
+                .padding(.trailing, 6)
+            }
 
             // Grid
             ZStack(alignment: .topLeading) {
@@ -405,6 +467,7 @@ struct GridView: View {
             .padding(.leading, 6)
         }
         .padding(.horizontal, screenMargin)
+        .animation(.easeOut(duration: 0.2), value: currentViewMode)
     }
 
     // MARK: - Static Grid with Current Week Indicator
@@ -551,6 +614,30 @@ struct GridView: View {
             .offset(x: x - (tapSize - cellSize) / 2, y: y - (tapSize - cellSize) / 2)
     }
 
+    // MARK: - View Mode Footer Content
+    // CRAFT_SPEC: Chapters - no button, Quality - Edit button, Focus - Ghost number
+
+    @ViewBuilder
+    private var viewModeFooterContent: some View {
+        Group {
+            switch currentViewMode {
+            case .chapters:
+                // No button in Chapters view - spine is the interaction
+                // Use invisible spacer to maintain layout
+                Color.clear.frame(height: 44)
+
+            case .quality:
+                // "Edit This Week" button only in Quality view
+                markCurrentWeekButton
+
+            case .focus:
+                // Ghost number in Focus view
+                GhostNumber(weeksRemaining: user.weeksRemaining)
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: currentViewMode)
+    }
+
     // MARK: - Mark Current Week Button
 
     private var markCurrentWeekButton: some View {
@@ -613,7 +700,38 @@ struct GridView: View {
                     }
                 }
             }
+
+            // CRAFT_SPEC: First-time swipe hint appears once, fades after 3s
+            showSwipeHintIfNeeded()
         }
+    }
+
+    // MARK: - Swipe Hint
+
+    private func showSwipeHintIfNeeded() {
+        // Only show once per user
+        guard !user.hasSeenSwipeHint else { return }
+
+        // Small delay after reveal
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            withAnimation(.easeOut(duration: 0.3)) {
+                showSwipeHint = true
+            }
+
+            // Auto-dismiss after 3s
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                dismissSwipeHint()
+            }
+        }
+    }
+
+    private func dismissSwipeHint() {
+        guard showSwipeHint else { return }
+
+        withAnimation(.easeOut(duration: 0.3)) {
+            showSwipeHint = false
+        }
+        user.hasSeenSwipeHint = true
     }
 
     // MARK: - Header
@@ -703,6 +821,7 @@ struct GridView: View {
         user.currentViewMode = currentViewMode
         rebuildGridColorsCache()
         flashModeLabel()
+        dismissSwipeHint() // Dismiss hint on first swipe
     }
 
     private func swipeToPreviousMode() {
@@ -711,6 +830,7 @@ struct GridView: View {
         user.currentViewMode = currentViewMode
         rebuildGridColorsCache()
         flashModeLabel()
+        dismissSwipeHint() // Dismiss hint on first swipe
     }
 
     // CRAFT_SPEC: Mode label flash - fade in 0.1s, hold 0.5s, fade out 0.2s (total 0.8s)
@@ -722,6 +842,53 @@ struct GridView: View {
             withAnimation(.easeOut(duration: 0.2)) {
                 showModeLabel = false
             }
+        }
+    }
+
+    // MARK: - Spine Label Handling
+
+    private func handleSpineTap(phase: LifePhase, yPosition: CGFloat) {
+        // Cancel any existing dismiss task
+        spineLabelDismissTask?.cancel()
+
+        spineLabelPhase = phase
+        spineLabelY = yPosition
+
+        withAnimation(.snappy(duration: 0.15, extraBounce: 0.1)) {
+            showSpineLabel = true
+        }
+
+        // CRAFT_SPEC: Label dismisses after 2s
+        spineLabelDismissTask = Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    showSpineLabel = false
+                }
+            }
+        }
+    }
+
+    // MARK: - Breathing Aura Color
+    // Updates based on the phase containing the current week
+
+    private func updateAuraColor() {
+        let birthYear = user.birthYear
+        let current = currentWeekNumber
+
+        // Find phase containing current week
+        if let phase = phases.first(where: { phase in
+            let start = phase.startWeek(birthYear: birthYear)
+            let end = phase.endWeek(birthYear: birthYear)
+            return current >= start && current <= end
+        }) {
+            currentAuraColor = Color.fromHex(phase.colorHex)
+        } else {
+            // No phase at current week - use subtle default
+            currentAuraColor = Color.gridFilled.opacity(0.5)
         }
     }
 
@@ -778,25 +945,30 @@ struct GridView: View {
     }
 
     // MARK: - Footer
+    // Hidden in Focus view (ghost number is the footer)
 
     private var footerView: some View {
-        HStack(spacing: 32) {
-            VStack(spacing: 4) {
-                Text("\(user.weeksLived.formatted())")
-                    .font(.system(size: 28, weight: .light, design: .rounded))
-                    .foregroundStyle(Color.textPrimary)
-                Text("lived")
-                    .font(.caption2)
-                    .foregroundStyle(Color.textTertiary)
-            }
+        Group {
+            if currentViewMode != .focus {
+                HStack(spacing: 32) {
+                    VStack(spacing: 4) {
+                        Text("\(user.weeksLived.formatted())")
+                            .font(.system(size: 28, weight: .light, design: .rounded))
+                            .foregroundStyle(Color.textPrimary)
+                        Text("lived")
+                            .font(.caption2)
+                            .foregroundStyle(Color.textTertiary)
+                    }
 
-            VStack(spacing: 4) {
-                Text("\(user.weeksRemaining.formatted())")
-                    .font(.system(size: 28, weight: .light, design: .rounded))
-                    .foregroundStyle(Color.textSecondary)
-                Text("remaining")
-                    .font(.caption2)
-                    .foregroundStyle(Color.textTertiary)
+                    VStack(spacing: 4) {
+                        Text("\(user.weeksRemaining.formatted())")
+                            .font(.system(size: 28, weight: .light, design: .rounded))
+                            .foregroundStyle(Color.textSecondary)
+                        Text("remaining")
+                            .font(.caption2)
+                            .foregroundStyle(Color.textTertiary)
+                    }
+                }
             }
         }
         .opacity(hasRevealCompleted ? 1 : 0)
