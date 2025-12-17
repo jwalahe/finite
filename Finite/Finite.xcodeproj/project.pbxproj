@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		9F62FADD2EF232670013FB91 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9F62FADC2EF232670013FB91 /* WidgetKit.framework */; };
+		9F62FADF2EF232670013FB91 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9F62FADE2EF232670013FB91 /* SwiftUI.framework */; };
+		9F62FAF02EF232670013FB91 /* FiniteWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9F62FADA2EF232670013FB91 /* FiniteWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		9F04E9672EF0C1A90068B368 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,13 +27,48 @@
 			remoteGlobalIDString = 9F04E9562EF0C1A80068B368;
 			remoteInfo = Finite;
 		};
+		9F62FAEE2EF232670013FB91 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9F04E94F2EF0C1A80068B368 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9F62FAD92EF232670013FB91;
+			remoteInfo = FiniteWidgetExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		9F62FAF52EF232670013FB91 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				9F62FAF02EF232670013FB91 /* FiniteWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		9F04E9572EF0C1A80068B368 /* Finite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Finite.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9F04E9662EF0C1A90068B368 /* FiniteTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FiniteTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9F04E9702EF0C1A90068B368 /* FiniteUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FiniteUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		9F62FADA2EF232670013FB91 /* FiniteWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FiniteWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		9F62FADC2EF232670013FB91 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		9F62FADE2EF232670013FB91 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		9F62FAF92EF2333C0013FB91 /* FiniteWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FiniteWidgetExtension.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		9F62FAF12EF232670013FB91 /* Exceptions for "FiniteWidget" folder in "FiniteWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 9F62FAD92EF232670013FB91 /* FiniteWidgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9F04E9592EF0C1A80068B368 /* Finite */ = {
@@ -43,6 +84,14 @@
 		9F04E9732EF0C1A90068B368 /* FiniteUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = FiniteUITests;
+			sourceTree = "<group>";
+		};
+		9F62FAE02EF232670013FB91 /* FiniteWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				9F62FAF12EF232670013FB91 /* Exceptions for "FiniteWidget" folder in "FiniteWidgetExtension" target */,
+			);
+			path = FiniteWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -69,15 +118,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9F62FAD72EF232670013FB91 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9F62FADF2EF232670013FB91 /* SwiftUI.framework in Frameworks */,
+				9F62FADD2EF232670013FB91 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		9F04E94E2EF0C1A80068B368 = {
 			isa = PBXGroup;
 			children = (
+				9F62FAF92EF2333C0013FB91 /* FiniteWidgetExtension.entitlements */,
 				9F04E9592EF0C1A80068B368 /* Finite */,
 				9F04E9692EF0C1A90068B368 /* FiniteTests */,
 				9F04E9732EF0C1A90068B368 /* FiniteUITests */,
+				9F62FAE02EF232670013FB91 /* FiniteWidget */,
+				9F62FADB2EF232670013FB91 /* Frameworks */,
 				9F04E9582EF0C1A80068B368 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,8 +149,18 @@
 				9F04E9572EF0C1A80068B368 /* Finite.app */,
 				9F04E9662EF0C1A90068B368 /* FiniteTests.xctest */,
 				9F04E9702EF0C1A90068B368 /* FiniteUITests.xctest */,
+				9F62FADA2EF232670013FB91 /* FiniteWidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		9F62FADB2EF232670013FB91 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				9F62FADC2EF232670013FB91 /* WidgetKit.framework */,
+				9F62FADE2EF232670013FB91 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -102,10 +173,12 @@
 				9F04E9532EF0C1A80068B368 /* Sources */,
 				9F04E9542EF0C1A80068B368 /* Frameworks */,
 				9F04E9552EF0C1A80068B368 /* Resources */,
+				9F62FAF52EF232670013FB91 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				9F62FAEF2EF232670013FB91 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				9F04E9592EF0C1A80068B368 /* Finite */,
@@ -163,6 +236,28 @@
 			productReference = 9F04E9702EF0C1A90068B368 /* FiniteUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		9F62FAD92EF232670013FB91 /* FiniteWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9F62FAF22EF232670013FB91 /* Build configuration list for PBXNativeTarget "FiniteWidgetExtension" */;
+			buildPhases = (
+				9F62FAD62EF232670013FB91 /* Sources */,
+				9F62FAD72EF232670013FB91 /* Frameworks */,
+				9F62FAD82EF232670013FB91 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				9F62FAE02EF232670013FB91 /* FiniteWidget */,
+			);
+			name = FiniteWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = FiniteWidgetExtension;
+			productReference = 9F62FADA2EF232670013FB91 /* FiniteWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -184,6 +279,9 @@
 						CreatedOnToolsVersion = 16.4;
 						TestTargetID = 9F04E9562EF0C1A80068B368;
 					};
+					9F62FAD92EF232670013FB91 = {
+						CreatedOnToolsVersion = 16.4;
+					};
 				};
 			};
 			buildConfigurationList = 9F04E9522EF0C1A80068B368 /* Build configuration list for PBXProject "Finite" */;
@@ -203,6 +301,7 @@
 				9F04E9562EF0C1A80068B368 /* Finite */,
 				9F04E9652EF0C1A90068B368 /* FiniteTests */,
 				9F04E96F2EF0C1A90068B368 /* FiniteUITests */,
+				9F62FAD92EF232670013FB91 /* FiniteWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -223,6 +322,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		9F04E96E2EF0C1A90068B368 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9F62FAD82EF232670013FB91 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -253,6 +359,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9F62FAD62EF232670013FB91 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -265,6 +378,11 @@
 			isa = PBXTargetDependency;
 			target = 9F04E9562EF0C1A80068B368 /* Finite */;
 			targetProxy = 9F04E9712EF0C1A90068B368 /* PBXContainerItemProxy */;
+		};
+		9F62FAEF2EF232670013FB91 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9F62FAD92EF232670013FB91 /* FiniteWidgetExtension */;
+			targetProxy = 9F62FAEE2EF232670013FB91 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -395,6 +513,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Finite/Finite.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5A8CQ344ZD;
@@ -423,6 +542,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Finite/Finite.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5A8CQ344ZD;
@@ -518,6 +638,62 @@
 			};
 			name = Release;
 		};
+		9F62FAF32EF232670013FB91 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = FiniteWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5A8CQ344ZD;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FiniteWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = FiniteWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jwalakompalli.Finite.FiniteWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		9F62FAF42EF232670013FB91 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = FiniteWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5A8CQ344ZD;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FiniteWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = FiniteWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jwalakompalli.Finite.FiniteWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -553,6 +729,15 @@
 			buildConfigurations = (
 				9F04E9812EF0C1A90068B368 /* Debug */,
 				9F04E9822EF0C1A90068B368 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9F62FAF22EF232670013FB91 /* Build configuration list for PBXNativeTarget "FiniteWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9F62FAF32EF232670013FB91 /* Debug */,
+				9F62FAF42EF232670013FB91 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

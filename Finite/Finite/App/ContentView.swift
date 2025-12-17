@@ -21,17 +21,25 @@ struct ContentView: View {
                 // Just completed onboarding - show grid WITH reveal animation
                 // This must be checked FIRST because @Query updates immediately
                 GridView(user: user, shouldReveal: true)
+                    .onAppear { syncWidgetData(for: user) }
             } else if let user = users.first {
                 // Returning user - show grid without reveal animation
                 GridView(user: user, shouldReveal: false)
+                    .onAppear { syncWidgetData(for: user) }
             } else {
                 // No user - show onboarding
                 OnboardingView { user in
                     currentUser = user
                     hasCompletedOnboarding = true
+                    syncWidgetData(for: user)
                 }
             }
         }
+    }
+
+    /// Sync user data to widget via App Group UserDefaults
+    private func syncWidgetData(for user: User) {
+        WidgetDataProvider.shared.updateWidgetData(from: user)
     }
 }
 
