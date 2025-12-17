@@ -13,32 +13,31 @@ struct CategoryPicker: View {
     // CRAFT_SPEC: Icon size 24pt, touch target 48pt, spacing 12pt
     private let iconSize: CGFloat = 24
     private let touchTarget: CGFloat = 48
+    private let spacing: CGFloat = 8
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(WeekCategory.allCases, id: \.self) { category in
-                    CategoryButton(
-                        category: category,
-                        isSelected: selectedCategory == category,
-                        iconSize: iconSize,
-                        touchTarget: touchTarget
-                    ) {
-                        withAnimation(.snappy(duration: 0.2)) {
-                            if selectedCategory == category {
-                                // Deselect if already selected
-                                selectedCategory = nil
-                            } else {
-                                selectedCategory = category
-                            }
+        HStack(spacing: spacing) {
+            ForEach(WeekCategory.allCases, id: \.self) { category in
+                CategoryButton(
+                    category: category,
+                    isSelected: selectedCategory == category,
+                    iconSize: iconSize,
+                    touchTarget: touchTarget
+                ) {
+                    withAnimation(.snappy(duration: 0.2)) {
+                        if selectedCategory == category {
+                            // Deselect if already selected
+                            selectedCategory = nil
+                        } else {
+                            selectedCategory = category
                         }
-                        // CRAFT_SPEC: Light haptic on selection
-                        HapticService.shared.light()
                     }
+                    // CRAFT_SPEC: Light haptic on selection
+                    HapticService.shared.light()
                 }
             }
-            .padding(.horizontal, 4)
         }
+        .frame(maxWidth: .infinity) // Center the HStack
     }
 }
 

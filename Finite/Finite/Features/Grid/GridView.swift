@@ -14,16 +14,6 @@ struct WeekIdentifier: Identifiable {
     let value: Int
 }
 
-// Pre-computed data for exploring a week (avoids calculations during drag)
-struct ExploringWeekData: Equatable {
-    let weekNumber: Int
-    let year: Int
-    let weekOfYear: Int
-    let dateRange: String
-    let rating: Int?
-    let isCurrentWeek: Bool
-}
-
 struct GridView: View {
     let user: User
     let shouldReveal: Bool
@@ -33,18 +23,15 @@ struct GridView: View {
 
     @State private var animationStartTime: Date?
     @State private var hasRevealCompleted: Bool = false
-    @State private var showPulse: Bool = false
 
     // Week selection state
     @State private var selectedWeekForDetail: WeekIdentifier?
 
-    // Touch-the-time gesture state
-    @State private var isExploring: Bool = false
-    @State private var exploringWeekNumber: Int?
-    @State private var exploringYear: Int?
+    // OPTIMIZATION: Cache ratedWeeks to avoid rebuilding on every frame
+    @State private var ratedWeeksCache: [Int: Int] = [:]
 
-    // Pre-computed week data for performance (avoids repeated lookups during drag)
-    @State private var exploringWeekData: ExploringWeekData?
+    // Scrubber state - isolated to prevent cascade
+    @State private var isScrubbing: Bool = false
 
     private let weeksPerRow: Int = 52
     private let revealDuration: Double = 2.0
@@ -61,21 +48,26 @@ struct GridView: View {
         weeks.first { $0.weekNumber == weekNumber }
     }
 
+    // Rebuild cache from weeks data
+    private func rebuildRatedWeeksCache() {
+        ratedWeeksCache = Dictionary(uniqueKeysWithValues: weeks.compactMap { week -> (Int, Int)? in
+            guard let rating = week.rating else { return nil }
+            return (week.weekNumber, rating)
+        })
+    }
+
     private var totalWeeks: Int { user.totalWeeks }
     private var weeksLived: Int { user.weeksLived }
     private var currentWeekNumber: Int { user.currentWeekNumber }
 
     // Check if current week is already marked
     private var isCurrentWeekMarked: Bool {
-        weekData(for: currentWeekNumber)?.rating != nil
+        ratedWeeksCache[currentWeekNumber] != nil
     }
 
     // Dynamic cell sizing based on available width
     private func calculateGridMetrics(for screenWidth: CGFloat) -> (cellSize: CGFloat, spacing: CGFloat, gridWidth: CGFloat) {
-        // Available width = screen - margins - age labels on both sides (for centering)
         let availableWidth = screenWidth - (screenMargin * 2) - (ageLabelWidth * 2)
-        // 52 cells + 51 gaps, with spacing = cellSize * 0.25
-        // Total = 52c + 51 * 0.25c = 64.75c
         let cellSize = floor((availableWidth / 64.75) * 2) / 2
         let spacing = cellSize * 0.25
         let gridWidth = CGFloat(weeksPerRow) * (cellSize + spacing) - spacing
@@ -91,13 +83,14 @@ struct GridView: View {
             let rowHeight = cellSize + spacing
             let gridHeight = CGFloat(user.lifeExpectancy) * rowHeight - spacing
 
-            ZStack {
+            VStack(spacing: 0) {
+                // Scrollable content
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 0) {
                         headerView
                             .padding(.bottom, 24)
 
-                        // Grid with age labels - centered
+                        // Grid with age labels
                         gridWithLabels(
                             cellSize: cellSize,
                             spacing: spacing,
@@ -106,7 +99,7 @@ struct GridView: View {
                         )
 
                         // "Mark This Week" button
-                        if hasRevealCompleted && !isExploring {
+                        if hasRevealCompleted && !isScrubbing {
                             markCurrentWeekButton
                                 .padding(.top, 24)
                                 .transition(.opacity.combined(with: .scale(scale: 0.95)))
@@ -114,14 +107,29 @@ struct GridView: View {
 
                         footerView
                             .padding(.top, 32)
-                            .padding(.bottom, 48)
+                            .padding(.bottom, 24)
                     }
                     .padding(.top, 24)
                 }
 
-                // Floating week indicator - uses pre-computed data for performance
-                if isExploring, let data = exploringWeekData {
-                    weekIndicatorCard(data: data)
+                // Timeline Scrubber - Fixed at bottom, outside ScrollView
+                // OPTIMIZATION: Isolated view to prevent state changes from invalidating grid
+                if hasRevealCompleted {
+                    TimelineScrubber(
+                        weeksLived: weeksLived,
+                        totalWeeks: totalWeeks,
+                        currentWeekNumber: currentWeekNumber,
+                        lifeExpectancy: user.lifeExpectancy,
+                        ratedWeeks: ratedWeeksCache,
+                        screenWidth: geometry.size.width,
+                        onWeekSelected: { weekNum in
+                            selectedWeekForDetail = WeekIdentifier(value: weekNum)
+                        },
+                        onScrubbingChanged: { scrubbing in
+                            isScrubbing = scrubbing
+                        }
+                    )
+                    .padding(.bottom, geometry.safeAreaInsets.bottom > 0 ? 0 : 16)
                 }
             }
         }
@@ -131,20 +139,30 @@ struct GridView: View {
                 startRevealAnimation()
             } else {
                 hasRevealCompleted = true
-                showPulse = true
             }
+            // Initial cache build
+            rebuildRatedWeeksCache()
         }
-        .sheet(item: $selectedWeekForDetail) { weekNumber in
+        .onChange(of: weeks.count) { _, _ in
+            // Rebuild cache when weeks change (new week marked)
+            rebuildRatedWeeksCache()
+        }
+        .sheet(item: $selectedWeekForDetail) { weekId in
             WeekDetailSheet(
                 user: user,
-                weekNumber: weekNumber.value,
-                existingWeek: weekData(for: weekNumber.value)
+                weekNumber: weekId.value,
+                existingWeek: weekData(for: weekId.value)
             )
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
+            .onDisappear {
+                // Rebuild cache after sheet dismisses (week may have been updated)
+                rebuildRatedWeeksCache()
+            }
         }
-        .animation(.easeOut(duration: 0.2), value: isExploring)
     }
+
+    // MARK: - Timeline Scrubber (Delegated to isolated view)
 
     // MARK: - Grid with Age Labels
 
@@ -155,25 +173,20 @@ struct GridView: View {
         gridHeight: CGFloat
     ) -> some View {
         let rowHeight = cellSize + spacing
-
-        // Determine which ages to show labels for
-        // Show: 0, decade marks (10, 20, 30...), and current age
-        // But skip current age if it's within 2 years of a decade mark (to avoid visual crowding)
         let currentAge = user.yearsLived
-        let nearestDecade = ((currentAge + 5) / 10) * 10  // Round to nearest decade
+        let nearestDecade = ((currentAge + 5) / 10) * 10
         let distanceToDecade = abs(currentAge - nearestDecade)
-        let showCurrentAge = distanceToDecade > 2  // Only show if more than 2 years from decade
+        let showCurrentAge = distanceToDecade > 2
 
         return HStack(alignment: .top, spacing: 0) {
             // Left age labels
             VStack(alignment: .trailing, spacing: 0) {
                 ForEach(0..<user.lifeExpectancy, id: \.self) { year in
-                    let age = year
-                    let isDecadeMark = age == 0 || age % 10 == 0
+                    let isDecadeMark = year == 0 || year % 10 == 0
                     let isCurrentAge = year == currentAge && showCurrentAge
                     let showLabel = isDecadeMark || isCurrentAge
 
-                    Text(showLabel ? "\(age)" : "")
+                    Text(showLabel ? "\(year)" : "")
                         .font(.system(size: 9, weight: .medium, design: .rounded))
                         .foregroundStyle(year == currentAge ? Color.textPrimary : Color.textTertiary)
                         .frame(width: ageLabelWidth, height: rowHeight, alignment: .trailing)
@@ -183,11 +196,10 @@ struct GridView: View {
 
             // Grid
             ZStack(alignment: .topLeading) {
-                // Main grid content
                 if shouldReveal && !hasRevealCompleted {
-                    animatedGridContent(cellSize: cellSize, spacing: spacing)
+                    animatedGridContent(cellSize: cellSize, spacing: spacing, gridWidth: gridWidth, gridHeight: gridHeight)
                 } else {
-                    interactiveGridContent(
+                    staticGridWithCurrentWeek(
                         cellSize: cellSize,
                         spacing: spacing,
                         gridWidth: gridWidth,
@@ -195,22 +207,17 @@ struct GridView: View {
                     )
                 }
 
-                // Year highlight when exploring
-                if isExploring, let year = exploringYear {
-                    yearHighlight(year: year, cellSize: cellSize, spacing: spacing, gridWidth: gridWidth)
-                }
             }
             .frame(width: gridWidth, height: gridHeight)
 
-            // Right age labels (for symmetry/centering)
+            // Right age labels
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(0..<user.lifeExpectancy, id: \.self) { year in
-                    let age = year
-                    let isDecadeMark = age == 0 || age % 10 == 0
+                    let isDecadeMark = year == 0 || year % 10 == 0
                     let isCurrentAge = year == currentAge && showCurrentAge
                     let showLabel = isDecadeMark || isCurrentAge
 
-                    Text(showLabel ? "\(age)" : "")
+                    Text(showLabel ? "\(year)" : "")
                         .font(.system(size: 9, weight: .medium, design: .rounded))
                         .foregroundStyle(year == currentAge ? Color.textPrimary : Color.textTertiary)
                         .frame(width: ageLabelWidth, height: rowHeight, alignment: .leading)
@@ -221,348 +228,106 @@ struct GridView: View {
         .padding(.horizontal, screenMargin)
     }
 
-    // MARK: - Year Highlight
+    // MARK: - Static Grid with Current Week Indicator
 
-    private func yearHighlight(year: Int, cellSize: CGFloat, spacing: CGFloat, gridWidth: CGFloat) -> some View {
-        let rowHeight = cellSize + spacing
-        let y = CGFloat(year) * rowHeight
-
-        return RoundedRectangle(cornerRadius: 4)
-            .fill(Color.weekCurrent.opacity(0.1))
-            .frame(width: gridWidth + 8, height: rowHeight + 4)
-            .offset(x: -4, y: y - 2)
-            .allowsHitTesting(false)
-    }
-
-    // MARK: - Interactive Grid Content
-    //
-    // PERFORMANCE: The grid Canvas is static and only redraws when `weeks` data changes.
-    // Exploration dimming is handled via an overlay layer, NOT inside the Canvas.
-    // This prevents 4160 circles from being redrawn every gesture frame.
-
-    private func interactiveGridContent(
+    private func staticGridWithCurrentWeek(
         cellSize: CGFloat,
         spacing: CGFloat,
         gridWidth: CGFloat,
         gridHeight: CGFloat
     ) -> some View {
-        let ratedWeeks = Dictionary(uniqueKeysWithValues: weeks.compactMap { week -> (Int, Int)? in
-            guard let rating = week.rating else { return nil }
-            return (week.weekNumber, rating)
-        })
+        ZStack(alignment: .topLeading) {
+            // Grid canvas
+            Canvas { context, _ in
+                for weekNumber in 1...totalWeeks {
+                    let row = (weekNumber - 1) / weeksPerRow
+                    let col = (weekNumber - 1) % weeksPerRow
+                    let x = CGFloat(col) * (cellSize + spacing)
+                    let y = CGFloat(row) * (cellSize + spacing)
+                    let rect = CGRect(x: x, y: y, width: cellSize, height: cellSize)
+                    let circle = Path(ellipseIn: rect)
 
-        return ZStack(alignment: .topLeading) {
-            // Static grid canvas - only redraws when weeks data changes
-            staticGridCanvas(
-                cellSize: cellSize,
-                spacing: spacing,
-                gridWidth: gridWidth,
-                gridHeight: gridHeight,
-                ratedWeeks: ratedWeeks
-            )
+                    let isLived = weekNumber <= weeksLived
+                    let isCurrent = weekNumber == currentWeekNumber
 
-            // Exploration dimming overlay - lightweight, only draws dim rectangles
-            if isExploring, let highlightYear = exploringYear {
-                explorationDimmingOverlay(
-                    highlightYear: highlightYear,
-                    cellSize: cellSize,
-                    spacing: spacing,
-                    gridWidth: gridWidth,
-                    gridHeight: gridHeight
-                )
+                    // Don't skip current week - we'll draw it in the canvas too
+                    let color: Color
+                    if let rating = ratedWeeksCache[weekNumber] {
+                        color = Color.ratingColor(for: rating)
+                    } else if isCurrent {
+                        color = .weekCurrent
+                    } else if isLived {
+                        color = .gridFilled
+                    } else {
+                        color = .gridUnfilled
+                    }
+
+                    context.fill(circle, with: .color(color))
+                }
             }
+            .frame(width: gridWidth, height: gridHeight)
+            .drawingGroup()
 
-            // Current week pulse (tappable)
-            if showPulse && !isExploring {
-                currentWeekPulse(cellSize: cellSize, spacing: spacing)
-            }
+            // Current week pulse ring (more visible)
+            currentWeekPulseRing(cellSize: cellSize, spacing: spacing)
 
-            // Gesture layer
-            gestureLayer(cellSize: cellSize, spacing: spacing, gridWidth: gridWidth, gridHeight: gridHeight)
+            // Tap gesture for current week quick access
+            currentWeekTapTarget(cellSize: cellSize, spacing: spacing)
         }
         .frame(width: gridWidth, height: gridHeight)
     }
 
-    // MARK: - Static Grid Canvas (Performance Optimized)
+    // MARK: - Current Week Pulse Ring (More Visible)
+    // OPTIMIZATION: Pauses during scrub to reduce concurrent animations
 
-    private func staticGridCanvas(
-        cellSize: CGFloat,
-        spacing: CGFloat,
-        gridWidth: CGFloat,
-        gridHeight: CGFloat,
-        ratedWeeks: [Int: Int]
-    ) -> some View {
-        Canvas { context, _ in
-            for weekNumber in 1...totalWeeks {
-                let row = (weekNumber - 1) / weeksPerRow
-                let col = (weekNumber - 1) % weeksPerRow
-                let x = CGFloat(col) * (cellSize + spacing)
-                let y = CGFloat(row) * (cellSize + spacing)
-                let rect = CGRect(x: x, y: y, width: cellSize, height: cellSize)
-                let circle = Path(ellipseIn: rect)
+    private func currentWeekPulseRing(cellSize: CGFloat, spacing: CGFloat) -> some View {
+        let row = (currentWeekNumber - 1) / weeksPerRow
+        let col = (currentWeekNumber - 1) % weeksPerRow
+        let x = CGFloat(col) * (cellSize + spacing) + cellSize / 2
+        let y = CGFloat(row) * (cellSize + spacing) + cellSize / 2
 
-                let isLived = weekNumber <= weeksLived
-                let isCurrent = weekNumber == currentWeekNumber
+        return Group {
+            if isScrubbing {
+                // Static ring during scrub - no TimelineView overhead
+                Circle()
+                    .stroke(Color.weekCurrent.opacity(0.4), lineWidth: 2)
+                    .frame(width: cellSize * 2.0, height: cellSize * 2.0)
+                    .position(x: x, y: y)
+            } else {
+                // Animated pulse when not scrubbing
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                    let elapsed = timeline.date.timeIntervalSinceReferenceDate
+                    let phase = (sin(elapsed * .pi * 0.8) + 1) / 2
+                    let ringScale = 1.8 + (0.6 * phase)
+                    let ringOpacity = 0.6 - (0.4 * phase)
 
-                // Skip current week - it has its own pulsing view
-                if isCurrent && showPulse {
-                    continue
+                    Circle()
+                        .stroke(Color.weekCurrent.opacity(ringOpacity), lineWidth: 2)
+                        .frame(width: cellSize * ringScale, height: cellSize * ringScale)
+                        .position(x: x, y: y)
                 }
-
-                let color: Color
-                if let rating = ratedWeeks[weekNumber] {
-                    color = Color.ratingColor(for: rating)
-                } else if isLived {
-                    color = .gridFilled
-                } else {
-                    color = .gridUnfilled
-                }
-
-                context.fill(circle, with: .color(color))
             }
         }
-        .frame(width: gridWidth, height: gridHeight)
-        .drawingGroup() // Rasterize for better performance
-    }
-
-    // MARK: - Exploration Dimming Overlay (Lightweight)
-    //
-    // Uses a simple opacity mask approach instead of drawing 80 rectangles.
-    // Only redraws when highlightYear changes (once per year crossing, not 60fps).
-
-    private func explorationDimmingOverlay(
-        highlightYear: Int,
-        cellSize: CGFloat,
-        spacing: CGFloat,
-        gridWidth: CGFloat,
-        gridHeight: CGFloat
-    ) -> some View {
-        let rowHeight = cellSize + spacing
-        let highlightY = CGFloat(highlightYear) * rowHeight
-
-        return ZStack(alignment: .topLeading) {
-            // Top dim region (above highlighted year)
-            if highlightYear > 0 {
-                Color.bgPrimary.opacity(0.7)
-                    .frame(width: gridWidth, height: highlightY)
-            }
-
-            // Bottom dim region (below highlighted year)
-            let bottomY = highlightY + rowHeight
-            let bottomHeight = gridHeight - bottomY
-            if bottomHeight > 0 {
-                Color.bgPrimary.opacity(0.7)
-                    .frame(width: gridWidth, height: bottomHeight)
-                    .offset(y: bottomY)
-            }
-        }
-        .frame(width: gridWidth, height: gridHeight, alignment: .topLeading)
         .allowsHitTesting(false)
     }
 
-    // MARK: - Current Week Pulse (Tappable)
+    // MARK: - Current Week Tap Target
 
-    private func currentWeekPulse(cellSize: CGFloat, spacing: CGFloat) -> some View {
+    private func currentWeekTapTarget(cellSize: CGFloat, spacing: CGFloat) -> some View {
         let row = (currentWeekNumber - 1) / weeksPerRow
         let col = (currentWeekNumber - 1) % weeksPerRow
         let x = CGFloat(col) * (cellSize + spacing)
         let y = CGFloat(row) * (cellSize + spacing)
+        let tapSize: CGFloat = 44 // Minimum iOS tap target
 
-        return Button {
-            HapticService.shared.light()
-            selectedWeekForDetail = WeekIdentifier(value: currentWeekNumber)
-        } label: {
-            PulsingDot(cellSize: cellSize)
-        }
-        .buttonStyle(.plain)
-        .offset(x: x, y: y)
-    }
-
-    // MARK: - Gesture Layer
-    //
-    // NOTE: We use simultaneousGesture with a DragGesture that has minimumDistance: 0
-    // instead of LongPressGesture.sequenced(before: DragGesture) because:
-    // 1. ScrollView intercepts and delays touch delivery for gesture disambiguation
-    // 2. LongPressGesture requires finger to stay still, which ScrollView interferes with
-    // 3. By tracking touch duration ourselves, we bypass ScrollView's gesture priority
-
-    private func gestureLayer(
-        cellSize: CGFloat,
-        spacing: CGFloat,
-        gridWidth: CGFloat,
-        gridHeight: CGFloat
-    ) -> some View {
-        Color.clear
+        return Color.clear
+            .frame(width: tapSize, height: tapSize)
             .contentShape(Rectangle())
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                    .onChanged { value in
-                        // Calculate how long we've been holding
-                        let holdDuration = Date().timeIntervalSince(value.time)
-
-                        // Only activate after 0.15 second hold
-                        if holdDuration >= 0.15 || isExploring {
-                            handleExploreGesture(
-                                at: value.location,
-                                cellSize: cellSize,
-                                spacing: spacing
-                            )
-                        }
-                    }
-                    .onEnded { _ in
-                        if isExploring {
-                            handleExploreEnd()
-                        }
-                    }
-            )
-            .frame(width: gridWidth, height: gridHeight)
-    }
-
-    // MARK: - Explore Gesture Handling
-
-    private func handleExploreGesture(at location: CGPoint, cellSize: CGFloat, spacing: CGFloat) {
-        let cellWithSpacing = cellSize + spacing
-        let col = Int(location.x / cellWithSpacing)
-        let row = Int(location.y / cellWithSpacing)
-
-        // Clamp to valid range
-        let clampedRow = max(0, min(row, user.lifeExpectancy - 1))
-        let clampedCol = max(0, min(col, weeksPerRow - 1))
-
-        let weekNumber = clampedRow * weeksPerRow + clampedCol + 1
-        let isValid = weekNumber >= 1 && weekNumber <= weeksLived
-        let newWeekNumber = isValid ? weekNumber : nil
-
-        // Start exploring if not already
-        if !isExploring {
-            isExploring = true
-            HapticService.shared.medium()
-        }
-
-        // Only update state if year changed (reduces redraws)
-        let yearChanged = exploringYear != clampedRow
-
-        if yearChanged {
-            exploringYear = clampedRow
-            // Haptic only on year boundary crossing - much less frequent
-            HapticService.shared.selection()
-        }
-
-        // Only recompute week data when the week actually changes
-        // This is the KEY optimization - we only do expensive work when needed
-        if exploringWeekNumber != newWeekNumber {
-            exploringWeekNumber = newWeekNumber
-
-            if let week = newWeekNumber {
-                // Pre-compute ALL data needed for the indicator card
-                // This runs once per week change, not 60fps
-                exploringWeekData = ExploringWeekData(
-                    weekNumber: week,
-                    year: (week - 1) / weeksPerRow,
-                    weekOfYear: (week - 1) % weeksPerRow + 1,
-                    dateRange: weekDateRange(for: week),
-                    rating: weekData(for: week)?.rating,
-                    isCurrentWeek: week == currentWeekNumber
-                )
-            } else {
-                exploringWeekData = nil
+            .onTapGesture {
+                HapticService.shared.light()
+                selectedWeekForDetail = WeekIdentifier(value: currentWeekNumber)
             }
-        }
-    }
-
-    private func handleExploreEnd() {
-        if let weekNumber = exploringWeekNumber {
-            HapticService.shared.medium()
-            selectedWeekForDetail = WeekIdentifier(value: weekNumber)
-        }
-        cancelExplore()
-    }
-
-    private func cancelExplore() {
-        isExploring = false
-        exploringWeekNumber = nil
-        exploringYear = nil
-        exploringWeekData = nil
-    }
-
-    // MARK: - Week Indicator Card (Performance Optimized)
-    //
-    // This card uses PRE-COMPUTED data from ExploringWeekData.
-    // All expensive operations (date formatting, week lookups) happen once
-    // when the week changes, NOT on every frame during drag.
-
-    private func weekIndicatorCard(data: ExploringWeekData) -> some View {
-        VStack(spacing: 6) {
-            // Week number
-            HStack(spacing: 8) {
-                if let rating = data.rating {
-                    Circle()
-                        .fill(Color.ratingColor(for: rating))
-                        .frame(width: 12, height: 12)
-                }
-
-                Text("Week \(data.weekNumber.formatted())")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.textPrimary)
-            }
-
-            // Context
-            Text("Age \(data.year) • Week \(data.weekOfYear) of year")
-                .font(.system(size: 13))
-                .foregroundStyle(Color.textSecondary)
-
-            // Date range (pre-computed)
-            Text(data.dateRange)
-                .font(.system(size: 12))
-                .foregroundStyle(Color.textTertiary)
-
-            // Status
-            if data.rating != nil {
-                Text("Tap to edit")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.textSecondary)
-                    .padding(.top, 2)
-            } else if data.isCurrentWeek {
-                Text("This week")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.weekCurrent)
-                    .padding(.top, 2)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.bgPrimary)
-                .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 8)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.border, lineWidth: 1)
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding(.top, 100)
-        .transition(.opacity.combined(with: .scale(scale: 0.9)))
-    }
-
-    // MARK: - Week Date Range Helper
-
-    private func weekDateRange(for weekNumber: Int) -> String {
-        let calendar = Calendar.current
-        let startOfLife = calendar.startOfDay(for: user.birthDate)
-
-        guard let weekStart = calendar.date(byAdding: .day, value: (weekNumber - 1) * 7, to: startOfLife),
-              let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) else {
-            return ""
-        }
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        let startStr = formatter.string(from: weekStart)
-        let endStr = formatter.string(from: weekEnd)
-
-        let startYear = calendar.component(.year, from: weekStart)
-        return "\(startStr) – \(endStr), \(startYear)"
+            .offset(x: x - (tapSize - cellSize) / 2, y: y - (tapSize - cellSize) / 2)
     }
 
     // MARK: - Mark Current Week Button
@@ -575,7 +340,7 @@ struct GridView: View {
             HStack(spacing: 8) {
                 if isCurrentWeekMarked {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.ratingColor(for: weekData(for: currentWeekNumber)?.rating ?? 3))
+                        .foregroundStyle(Color.ratingColor(for: ratedWeeksCache[currentWeekNumber] ?? 3))
                     Text("Edit This Week")
                 } else {
                     Image(systemName: "plus.circle.fill")
@@ -617,7 +382,6 @@ struct GridView: View {
             hasRevealCompleted = true
             HapticService.shared.heavy()
             AudioService.shared.playTap()
-            showPulse = true
         }
     }
 
@@ -642,17 +406,14 @@ struct GridView: View {
 
     // MARK: - Animated Grid
 
-    private func animatedGridContent(cellSize: CGFloat, spacing: CGFloat) -> some View {
-        let gridWidth = CGFloat(weeksPerRow) * (cellSize + spacing) - spacing
-        let gridHeight = CGFloat(user.lifeExpectancy) * (cellSize + spacing) - spacing
-
-        return TimelineView(.animation) { timeline in
+    private func animatedGridContent(cellSize: CGFloat, spacing: CGFloat, gridWidth: CGFloat, gridHeight: CGFloat) -> some View {
+        TimelineView(.animation) { timeline in
             let elapsed = animationStartTime.map { timeline.date.timeIntervalSince($0) } ?? 0
             let progress = min(1.0, elapsed / revealDuration)
             let easedProgress = 1 - pow(1 - progress, 2)
             let revealedCount = Int(Double(weeksLived) * easedProgress)
 
-            Canvas { context, size in
+            Canvas { context, _ in
                 for weekNumber in 1...totalWeeks {
                     let row = (weekNumber - 1) / weeksPerRow
                     let col = (weekNumber - 1) % weeksPerRow
@@ -699,26 +460,6 @@ struct GridView: View {
     }
 }
 
-// MARK: - Pulsing Dot View
-
-struct PulsingDot: View {
-    let cellSize: CGFloat
-    private let pulseDuration: Double = 2.0
-
-    var body: some View {
-        TimelineView(.animation) { timeline in
-            let elapsed = timeline.date.timeIntervalSinceReferenceDate
-            let phase = (sin(elapsed * .pi / pulseDuration) + 1) / 2
-            let scale = 1.0 + (0.25 * phase)
-
-            Circle()
-                .fill(Color.weekCurrent)
-                .frame(width: cellSize, height: cellSize)
-                .scaleEffect(scale)
-        }
-    }
-}
-
 // MARK: - Scale Button Style
 
 struct ScaleButtonStyle: ButtonStyle {
@@ -726,6 +467,199 @@ struct ScaleButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
             .animation(.snappy(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Isolated Timeline Scrubber
+// This is a separate struct to isolate its state from GridView
+// Scrubber position/highlight changes won't trigger GridView body recomputation
+
+struct TimelineScrubber: View {
+    let weeksLived: Int
+    let totalWeeks: Int
+    let currentWeekNumber: Int
+    let lifeExpectancy: Int
+    let ratedWeeks: [Int: Int]
+    let screenWidth: CGFloat
+    let onWeekSelected: (Int) -> Void
+    let onScrubbingChanged: (Bool) -> Void
+
+    // All scrubber state is LOCAL to this view
+    @State private var scrubberPosition: CGFloat = 0.0
+    @State private var isScrubbing: Bool = false
+    @State private var highlightedWeekNumber: Int?
+    @State private var isInitialized: Bool = false
+
+    private let weeksPerRow: Int = 52
+    private let scrubberPadding: CGFloat = 24
+    private let thumbSize: CGFloat = 28
+    private let trackHeight: CGFloat = 6
+
+    private var scrubberWidth: CGFloat {
+        screenWidth - (scrubberPadding * 2)
+    }
+
+    private var livedPosition: CGFloat {
+        CGFloat(weeksLived) / CGFloat(totalWeeks)
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            // Week info card (shows when scrubbing)
+            if isScrubbing, let weekNum = highlightedWeekNumber {
+                scrubberInfoCard(weekNumber: weekNum)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+
+            // Scrubber track
+            VStack(spacing: 8) {
+                ZStack(alignment: .leading) {
+                    // Background track
+                    Capsule()
+                        .fill(Color.bgTertiary)
+                        .frame(height: trackHeight)
+
+                    // Filled portion (lived weeks)
+                    Capsule()
+                        .fill(Color.gridFilled)
+                        .frame(width: scrubberWidth * livedPosition, height: trackHeight)
+
+                    // Thumb
+                    Circle()
+                        .fill(Color.bgPrimary)
+                        .frame(width: thumbSize, height: thumbSize)
+                        .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+                        .overlay(
+                            Circle()
+                                .fill(isScrubbing ? Color.weekCurrent : Color.gridFilled)
+                                .frame(width: thumbSize - 8, height: thumbSize - 8)
+                        )
+                        .offset(x: (scrubberWidth - thumbSize) * scrubberPosition)
+                }
+                .frame(width: scrubberWidth, height: thumbSize)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            if !isScrubbing {
+                                isScrubbing = true
+                                onScrubbingChanged(true)
+                                HapticService.shared.medium()
+                            }
+
+                            // Calculate position (0 to livedPosition only)
+                            let newPosition = max(0, min(livedPosition, value.location.x / scrubberWidth))
+                            scrubberPosition = newPosition
+
+                            // Calculate highlighted week
+                            let weekNum = max(1, min(weeksLived, Int(ceil(newPosition / livedPosition * CGFloat(weeksLived)))))
+                            if weekNum != highlightedWeekNumber {
+                                highlightedWeekNumber = weekNum
+                                HapticService.shared.selection()
+                            }
+                        }
+                        .onEnded { _ in
+                            if let weekNum = highlightedWeekNumber {
+                                HapticService.shared.medium()
+                                onWeekSelected(weekNum)
+                            }
+                            isScrubbing = false
+                            onScrubbingChanged(false)
+                            highlightedWeekNumber = nil
+                            // Reset to current position
+                            scrubberPosition = livedPosition
+                        }
+                )
+
+                // Minimal endpoint labels only
+                HStack {
+                    Text("0")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.textTertiary)
+                    Spacer()
+                    Text("\(lifeExpectancy)")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.textTertiary)
+                }
+                .padding(.horizontal, 4)
+            }
+            .padding(.horizontal, scrubberPadding)
+        }
+        .padding(.top, 8)
+        .background(Color.bgPrimary)
+        .onAppear {
+            if !isInitialized {
+                scrubberPosition = livedPosition
+                isInitialized = true
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: isScrubbing)
+    }
+
+    // MARK: - Info Card
+
+    private func scrubberInfoCard(weekNumber: Int) -> some View {
+        let year = (weekNumber - 1) / weeksPerRow
+        let weekOfYear = (weekNumber - 1) % weeksPerRow + 1
+        let rating = ratedWeeks[weekNumber]
+        let isCurrentWeek = weekNumber == currentWeekNumber
+
+        return HStack(spacing: 12) {
+            // Week indicator
+            ZStack {
+                if let rating = rating {
+                    Circle()
+                        .fill(Color.ratingColor(for: rating))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                } else {
+                    Circle()
+                        .stroke(isCurrentWeek ? Color.weekCurrent : Color.textTertiary, lineWidth: 2)
+                        .frame(width: 36, height: 36)
+                    if isCurrentWeek {
+                        Circle()
+                            .fill(Color.weekCurrent)
+                            .frame(width: 12, height: 12)
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text("Week \(weekNumber.formatted())")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.textPrimary)
+
+                    if isCurrentWeek {
+                        Text("NOW")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color.weekCurrent)
+                            .clipShape(Capsule())
+                    }
+                }
+
+                Text("Age \(year) • Week \(weekOfYear)")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.textSecondary)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.textTertiary)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.bgSecondary)
+        )
+        .padding(.horizontal, 24)
     }
 }
 
