@@ -16,20 +16,35 @@ final class User {
     // Settings
     var dailyNotificationEnabled: Bool
     var dailyNotificationTime: Date
-    var colorModeEnabled: Bool
     var lifeExpectancy: Int
+    var currentViewModeRaw: String
 
     // State tracking
     var hasSeenReveal: Bool
+    var hasSeenPhasePrompt: Bool
+    var hasSeenSwipeHint: Bool
 
     init(birthDate: Date) {
         self.birthDate = birthDate
         self.createdAt = Date()
         self.dailyNotificationEnabled = true
         self.dailyNotificationTime = Calendar.current.date(from: DateComponents(hour: 8, minute: 0)) ?? Date()
-        self.colorModeEnabled = true
         self.lifeExpectancy = 80
+        self.currentViewModeRaw = ViewMode.chapters.rawValue
         self.hasSeenReveal = false
+        self.hasSeenPhasePrompt = false
+        self.hasSeenSwipeHint = false
+    }
+
+    // MARK: - View Mode
+
+    var currentViewMode: ViewMode {
+        get {
+            ViewMode(rawValue: currentViewModeRaw) ?? .chapters
+        }
+        set {
+            currentViewModeRaw = newValue.rawValue
+        }
     }
 
     // MARK: - Computed Properties
@@ -57,5 +72,13 @@ final class User {
         let calendar = Calendar.current
         let components = calendar.dateComponents([.year], from: birthDate, to: Date())
         return components.year ?? 0
+    }
+
+    var birthYear: Int {
+        Calendar.current.component(.year, from: birthDate)
+    }
+
+    var currentYear: Int {
+        Calendar.current.component(.year, from: Date())
     }
 }

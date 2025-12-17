@@ -49,6 +49,38 @@ extension Color {
 
     static let border = Color(light: Color(hex: 0xE5E5E5), dark: Color(hex: 0x38383A))
 
+    // MARK: - Phase Colors (Chapters Mode - from CRAFT_SPEC)
+
+    static let phaseChildhood = Color(hex: 0x78716C)    // Warm gray
+    static let phaseSchool = Color(hex: 0x6366F1)       // Slate blue
+    static let phaseCollege = Color(hex: 0x4F46E5)      // Indigo
+    static let phaseEarlyCareer = Color(hex: 0x0D9488)  // Teal
+    static let phaseCareer = Color(hex: 0x059669)       // Emerald
+    static let phaseCustom1 = Color(hex: 0x9333EA)      // Purple
+    static let phaseCustom2 = Color(hex: 0xE11D48)      // Rose
+    static let phaseCustom3 = Color(hex: 0x0284C7)      // Sky
+
+    /// Ordered list of phase colors for auto-assignment
+    static let phaseColorPalette: [(hex: String, color: Color)] = [
+        ("#78716C", phaseChildhood),
+        ("#6366F1", phaseSchool),
+        ("#4F46E5", phaseCollege),
+        ("#0D9488", phaseEarlyCareer),
+        ("#059669", phaseCareer),
+        ("#9333EA", phaseCustom1),
+        ("#E11D48", phaseCustom2),
+        ("#0284C7", phaseCustom3)
+    ]
+
+    /// Get Color from hex string
+    static func fromHex(_ hex: String) -> Color {
+        let cleanHex = hex.replacingOccurrences(of: "#", with: "")
+        guard let intValue = UInt(cleanHex, radix: 16) else {
+            return .gray
+        }
+        return Color(hex: intValue)
+    }
+
     // MARK: - Legacy (for compatibility)
 
     static let gridUnfilled = weekEmpty

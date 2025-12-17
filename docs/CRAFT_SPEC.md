@@ -1,8 +1,8 @@
 # Finite — Craft Specification
 
 > Supplement to PRD.md — Technical parameters for premium execution  
-> **Version:** 1.0.0  
-> **Last Updated:** December 15, 2024
+> **Version:** 1.1.0  
+> **Last Updated:** December 17, 2024
 
 ---
 
@@ -51,8 +51,11 @@ This document translates design intent into precise technical specifications. Us
 | Week cell fill | 0.08s | 0 | — | During reveal cascade |
 | Week cell mark | 0.25s | 0.15 | `.snappy` | Color bloom |
 | Current week pulse | 2.0s | — | `.easeInOut` | Scale 1.0 → 1.08 → 1.0, repeat |
-| View mode toggle | 0.6s | 0 | `.easeOut` | Wash/paint effect |
+| View mode swipe | 0.2s | 0 | `.easeOut` | Crossfade between color schemes |
+| Mode label flash | 0.8s | 0 | `.easeOut` | Appear, hold, fade |
 | Spectrum slider thumb | 0.1s | 0.2 | `.snappy` | Snap to notch |
+| Modal present | 0.3s | 0.1 | `.smooth` | Slide up from bottom |
+| Year wheel scroll | — | 0.15 | `.smooth` | Native picker feel |
 
 ### SwiftUI Implementation
 
@@ -73,6 +76,13 @@ This document translates design intent into precise technical specifications. Us
 // Current week pulse
 .scaleEffect(isPulsing ? 1.08 : 1.0)
 .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: isPulsing)
+
+// View mode crossfade
+.animation(.easeOut(duration: 0.2), value: currentViewMode)
+
+// Mode label flash
+.opacity(showModeLabel ? 1.0 : 0.0)
+.animation(.easeOut(duration: 0.8), value: showModeLabel)
 ```
 
 ### The Reveal Animation (Signature Moment)
@@ -92,6 +102,7 @@ T+~30s:     Fill reaches current week
 T+30.1s:    Heavy haptic thud (.heavy)
 T+30.2s:    Current week begins pulsing
 T+30.5s:    Pencil SFX fades out
+T+31.5s:    Phase prompt modal slides up
 ```
 
 **Technical parameters:**
@@ -101,6 +112,7 @@ T+30.5s:    Pencil SFX fades out
 - Final haptic: `.heavy` impact
 - Pulse begins 100ms after final fill
 - Sound: Soft pencil/graphite scratching, volume 0.3, fade out over 500ms
+- Phase prompt: 1 second after pulse begins
 
 **Why this timing:** Fast enough to feel like time flying by, slow enough to comprehend the accumulation. The year-boundary haptics create rhythm without overwhelming. The final heavy thud signals "you are here."
 
@@ -120,7 +132,9 @@ T+30.5s:    Pencil SFX fades out
 | Week mark confirm | Impact | `.medium` | On sheet dismiss |
 | Year boundary (reveal) | Impact | `.medium` | When year completes |
 | Reveal complete | Impact | `.heavy` | Single thud |
-| View mode toggle | Impact | `.medium` | On toggle |
+| View mode swipe | Impact | `.light` | On mode change |
+| Year wheel tick | Selection | — | On year change |
+| Phase add confirm | Impact | `.medium` | On "Add Chapter" |
 | Error | Notification | `.error` | On validation fail |
 
 ### Implementation
@@ -172,6 +186,7 @@ All spacing values must be multiples of 8pt.
 - Minimum: 44×44pt (Apple HIG)
 - Preferred: 48×48pt
 - Grid cells: Can be smaller visually, but tap target extends to 44pt
+- Year wheel rows: 44pt height minimum
 
 ### Screen Layout
 
@@ -207,6 +222,7 @@ All spacing values must be multiples of 8pt.
 | `body-emphasis` | 17pt | Semibold | 22pt | Emphasized body |
 | `caption` | 13pt | Regular | 18pt | Secondary info |
 | `caption-sm` | 11pt | Regular | 13pt | Tertiary info |
+| `mode-label` | 15pt | Medium | 20pt | View mode flash label |
 
 ### Type Rules
 
@@ -243,16 +259,16 @@ All spacing values must be multiples of 8pt.
 | `text-tertiary` | #636366 | 99,99,102 | Placeholder, disabled |
 | `border` | #38383A | 56,56,58 | Dividers, outlines |
 
-### Grid Colors
+### Grid Colors — Focus Mode (B&W)
 
-**B&W Mode:**
 | Token | Light Mode | Dark Mode | Use |
 |-------|------------|-----------|-----|
 | `week-empty` | #E0E0E0 | #3A3A3A | Unfilled weeks |
 | `week-filled` | #2A2A2A | #E5E5E5 | Filled weeks |
 | `week-current` | #1A1A1A | #FFFFFF | Current week (with pulse) |
 
-**Color Mode (Spectrum):**
+### Grid Colors — Quality Mode (Spectrum)
+
 | Rating | Label | Hex | Use |
 |--------|-------|-----|-----|
 | 1 | Awful | #DC2626 | Deep red |
@@ -261,11 +277,28 @@ All spacing values must be multiples of 8pt.
 | 4 | Good | #65A30D | Soft green |
 | 5 | Great | #16A34A | Deep green |
 
+### Grid Colors — Chapters Mode (Phase Colors)
+
+| Phase Type | Hex | Notes |
+|------------|-----|-------|
+| Childhood | #78716C | Warm gray |
+| School | #6366F1 | Slate blue |
+| College | #4F46E5 | Indigo |
+| Early Career | #0D9488 | Teal |
+| Career | #059669 | Emerald |
+| Custom 1 | #9333EA | Purple |
+| Custom 2 | #E11D48 | Rose |
+| Custom 3 | #0284C7 | Sky |
+
+Auto-assignment order: Colors assigned in sequence as phases are created. User can change any phase color in Settings.
+
 ### Color Rules
 
 1. Never use pure black (#000000) or pure white (#FFFFFF) for backgrounds
-2. Spectrum colors are for week fills only — no spectrum colors in UI chrome
-3. Maintain WCAG AA contrast (4.5:1) for all text
+2. Spectrum colors are for Quality mode week fills only
+3. Phase colors are for Chapters mode week fills only
+4. Focus mode uses only B&W palette
+5. Maintain WCAG AA contrast (4.5:1) for all text
 
 ---
 
@@ -286,10 +319,57 @@ Corner radius: 50% (circle)
 
 States:
 - Empty: stroke only, week-empty color
-- Filled (B&W): solid fill, week-filled color
-- Filled (Color): solid fill, spectrum color
+- Filled (Focus): solid fill, week-filled color
+- Filled (Quality): solid fill, spectrum color based on rating
+- Filled (Chapters): solid fill, phase color
 - Current: filled + pulse animation
 - Tapped: scale 0.9x for 100ms, then expand to detail
+```
+
+### View Mode Indicator (Dot Indicator)
+
+```
+    ● ○ ○           ○ ● ○           ○ ○ ●
+  Chapters        Quality          Focus
+
+Dot size: 8pt diameter
+Spacing between dots: 8pt
+Active dot: text-primary color
+Inactive dot: text-tertiary color
+Position: Bottom center of grid, 16pt above safe area
+Transition: Crossfade 0.2s when mode changes
+```
+
+### View Mode Label (Flash)
+
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│              "Quality"                  │  ← Centered, fades after 0.8s
+│                                         │
+│              ○ ● ○                      │
+└─────────────────────────────────────────┘
+
+Font: mode-label (15pt Medium)
+Color: text-primary
+Background: bg-primary with 80% opacity, 8pt padding, 6pt corner radius
+Animation: Fade in 0.1s, hold 0.5s, fade out 0.2s
+```
+
+### Swipe View Toggle
+
+```
+Gesture: Horizontal swipe on grid area
+Direction: 
+  - Swipe left: Next mode (Chapters → Quality → Focus → Chapters)
+  - Swipe right: Previous mode (Focus → Quality → Chapters → Focus)
+Threshold: 50pt horizontal movement
+Animation: Grid crossfades between color schemes (0.2s)
+Feedback: 
+  - Mode label flashes
+  - Dot indicator updates
+  - Light haptic on change
+First-time hint: "← Swipe to change view →" appears once, fades after 3s
 ```
 
 ### Spectrum Slider
@@ -366,6 +446,99 @@ Present animation: 0.35s ease-out
 Dismiss: swipe down or tap Done
 ```
 
+### Phase Prompt Modal
+
+```
+┌─────────────────────────────────────────────┐
+│                                             │
+│                                             │
+│         Your past is empty.                 │  title-md, text-primary, centered
+│         Add life chapters?                  │  body, text-secondary, centered
+│                                             │
+│  ┌─────────────────────────────────────┐   │
+│  │        Yes, add chapters            │   │  Primary button
+│  └─────────────────────────────────────┘   │
+│                                             │
+│  ┌─────────────────────────────────────┐   │
+│  │           Skip for now              │   │  Secondary button (text only)
+│  └─────────────────────────────────────┘   │
+│                                             │
+└─────────────────────────────────────────────┘
+
+Position: Centered modal with dim background
+Background: bg-primary, corner radius 16pt
+Dim overlay: black 50% opacity
+Present: 1s after Reveal completes
+Animation: Slide up 0.3s with slight bounce
+```
+
+### Phase Builder
+
+```
+┌─────────────────────────────────────────────┐
+│  [Grid preview - mini version]              │
+│  ▪▪▪▪▪▪▪▪▪▪████████████████▪▪▪▪▪▪▪▪▪▪     │  Selected range highlighted
+│  ▪▪▪▪▪▪▪▪▪▪████████████████▪▪▪▪▪▪▪▪▪▪     │
+│─────────────────────────────────────────────│
+│                                             │
+│  Chapter name                               │  caption, text-secondary
+│  ┌─────────────────────────────────────┐   │
+│  │ College                              │   │  TextField, body
+│  └─────────────────────────────────────┘   │
+│                                             │
+│        From              To                 │  caption, text-secondary
+│    ┌─────────┐      ┌─────────┐            │
+│    │  2013   │      │  2017   │            │  Year wheel pickers
+│    │ >2014<  │      │ >2018<  │            │  Selected year emphasized
+│    │  2015   │      │  2019   │            │
+│    └─────────┘      └─────────┘            │
+│                                             │
+│  How was it overall?                        │  caption, text-secondary
+│           ○ ○ ● ○ ○                        │  Rating dots (optional)
+│           1 2 3 4 5                         │
+│                                             │
+│  ┌─────────────────────────────────────┐   │
+│  │           Add Chapter               │   │  Primary button
+│  └─────────────────────────────────────┘   │
+│                                             │
+└─────────────────────────────────────────────┘
+
+Grid preview: ~30% of screen height, live updates as years change
+Year wheels: Native Picker style, haptic on year change
+Rating: Optional, defaults to middle (3) if not changed
+```
+
+### Phase Confirmation Screen
+
+```
+┌─────────────────────────────────────────────┐
+│                                             │
+│  ✓ Added "College" (2014-2018)              │  body-emphasis, text-primary
+│                                             │
+│  |░░░░░░░░░░░░|████|░░░░░░░|               │  Timeline visualization
+│  1995       2014  2018    2025              │  caption-sm, text-tertiary
+│                                             │
+│  19 years before. 7 years after.            │  body, text-secondary
+│                                             │
+│  ┌─────────────────────────────────────┐   │
+│  │           Add another               │   │  Primary button
+│  └─────────────────────────────────────┘   │
+│                                             │
+│  ┌─────────────────────────────────────┐   │
+│  │          Done for now               │   │  Secondary button (text only)
+│  └─────────────────────────────────────┘   │
+│                                             │
+└─────────────────────────────────────────────┘
+
+Timeline bar:
+  - Total width: screen width - 48pt (margins)
+  - Height: 8pt
+  - Corner radius: 4pt
+  - Unfilled sections: bg-tertiary
+  - Filled section: phase color
+Year labels: caption-sm, positioned at start, phase boundaries, end
+```
+
 ---
 
 ## 8. State Specifications
@@ -385,8 +558,10 @@ Every screen has 5 states. All must be designed.
 - Current week pulses
 - No placeholder text needed — the empty grid IS the state
 
-**Settings (if applicable):**
-- Not applicable — settings always have defaults
+**Grid with phases but no marks:**
+- Phases show in Chapters mode
+- Quality mode shows empty (no ratings yet)
+- Focus mode shows B&W
 
 ### Error State
 
@@ -400,10 +575,12 @@ Every screen has 5 states. All must be designed.
 - Scale: 1.0 → 1.1 → 1.0 over 0.3s
 - Haptic: `.success` notification (only for significant actions)
 - For week marking: color bloom is the success feedback
+- For phase adding: checkmark + timeline update
 
 ### Partial State
 
 - Grid with some weeks marked, some empty
+- Phases partially covering life
 - No special treatment — this is the normal state
 
 ---
@@ -415,7 +592,7 @@ Every screen has 5 states. All must be designed.
 The first time a user sees their life visualized is the signature moment. It must create an emotional "oh" — the gut punch of mortality made visible.
 
 **What makes it signature:**
-- Not instant (takes 30 seconds — time has weight)
+- Not instant (takes ~30 seconds — time has weight)
 - Not silent (pencil sound makes it feel like drawing your life)
 - Not smooth (year-boundary haptics create rhythm of years passing)
 - Not passive (the grid is being drawn FOR you)
@@ -432,13 +609,23 @@ Each weekly marking should feel like a small ritual, not a checkbox.
 - Color bloom on confirm (the week takes on meaning)
 - Single category (what DEFINED this week?)
 
+### Tertiary Signature: The Three Lenses
+
+The swipe between view modes reinforces the philosophical core.
+
+**What makes it signature:**
+- Same data, three perspectives (chapters of life, quality of moments, raw mortality)
+- Gesture is perspective shift, not navigation
+- Focus mode strips away color — just you and the countdown
+- No labels needed on grid — the mode tells the story
+
 ### What Finite Will NOT Do
 
 - No streaks (trivializes reflection)
 - No badges (gamification inappropriate)
 - No celebrations (sobriety about mortality)
 - No sharing prompts (this is private)
-- No AI suggestions (this is human reflection)
+- No AI suggestions (this is human reflection) — *Note: V1.5 will add optional AI insights*
 - No push notification spam (one number, that's it)
 
 ---
@@ -453,6 +640,8 @@ Before any PR, verify:
 - [ ] Spring parameters match spec
 - [ ] No animation blocks user progress
 - [ ] Animations can be interrupted
+- [ ] View mode crossfade is smooth (0.2s)
+- [ ] Mode label flash timing correct (0.8s total)
 
 ### Haptics
 - [ ] All taps have haptic feedback
@@ -460,12 +649,15 @@ Before any PR, verify:
 - [ ] `.prepare()` called before time-sensitive haptics
 - [ ] No haptics on scroll
 - [ ] Haptics align with visual change moment
+- [ ] Year wheel has selection haptic
+- [ ] View mode swipe has light haptic
 
 ### Spacing
 - [ ] All values multiples of 8pt
 - [ ] Screen margins are 24pt
 - [ ] Touch targets minimum 44pt
 - [ ] Consistent spacing within component type
+- [ ] Dot indicator positioned correctly
 
 ### Typography
 - [ ] Maximum 4 type sizes on screen
@@ -477,13 +669,25 @@ Before any PR, verify:
 - [ ] Correct tokens used (not hardcoded hex)
 - [ ] Dark mode tested
 - [ ] Contrast meets WCAG AA
-- [ ] Spectrum colors only on week fills
+- [ ] Spectrum colors only in Quality mode
+- [ ] Phase colors only in Chapters mode
+- [ ] Focus mode is strictly B&W
 
 ### States
 - [ ] Loading state designed
 - [ ] Empty state designed
 - [ ] Error state designed
 - [ ] Success feedback exists
+- [ ] All three view modes tested
+
+### View Modes
+- [ ] Chapters mode shows phase colors correctly
+- [ ] Quality mode shows rating spectrum correctly
+- [ ] Focus mode is strictly B&W
+- [ ] Swipe gesture recognized reliably
+- [ ] Dot indicator updates on mode change
+- [ ] Mode label flashes and fades correctly
+- [ ] First-time hint shows once only
 
 ---
 
@@ -499,7 +703,12 @@ finite-ios/
 │   ├── DESIGN_PROMPTS.md         # Gemini prompts for mockups
 │   └── designs/                  # Generated mockups
 │       ├── 01-onboarding.png
-│       ├── 02-grid-empty.png
+│       ├── 02-grid-reveal.png
+│       ├── 03-phase-prompt.png
+│       ├── 04-phase-builder.png
+│       ├── 05-grid-chapters.png
+│       ├── 06-grid-quality.png
+│       ├── 07-grid-focus.png
 │       └── ...
 ```
 
@@ -516,9 +725,12 @@ Read these documents in order:
 
 Key principles:
 - Every tap needs visual feedback (scale 0.96x) + haptic (.light)
-- Animation durations: 0.1-0.15s for taps, 0.2-0.25s for state changes, 0.3-0.4s for modals
+- Animation durations: 0.1-0.15s for taps, 0.2s for view mode changes, 0.3-0.4s for modals
 - Spacing: all values multiples of 8pt, screen margins 24pt
 - The Reveal animation is the signature moment — implement it exactly per spec
+- Three view modes: Chapters (phase colors), Quality (rating spectrum), Focus (B&W)
+- Swipe left/right to change view modes with dot indicator
+- Phase builder uses dual year wheel pickers with live grid preview
 - Use SwiftUI's .snappy, .smooth, .bouncy presets
 - Prepare haptic generators before triggering
 

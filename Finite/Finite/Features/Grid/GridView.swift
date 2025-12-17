@@ -20,6 +20,7 @@ struct GridView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Query private var weeks: [Week]
+    @Query private var phases: [LifePhase]
 
     @State private var animationStartTime: Date?
     @State private var hasRevealCompleted: Bool = false
@@ -30,11 +31,18 @@ struct GridView: View {
     // OPTIMIZATION: Cache ratedWeeks to avoid rebuilding on every frame
     @State private var ratedWeeksCache: [Int: Int] = [:]
 
+    // OPTIMIZATION: Cache phase colors for week numbers
+    @State private var phaseColorsCache: [Int: String] = [:]
+
+    // OPTIMIZATION: Pre-computed grid colors array for instant mode switching
+    // Index = weekNumber - 1, stores resolved Color for each week
+    @State private var gridColorsCache: [Color] = []
+
     // Scrubber state - isolated to prevent cascade
     @State private var isScrubbing: Bool = false
 
-    // Color mode state
-    @State private var isColorMode: Bool = true
+    // View mode state (Chapters/Quality/Focus)
+    @State private var currentViewMode: ViewMode = .quality
 
     // Week confirm bloom animation
     @State private var bloomWeekNumber: Int?
@@ -43,6 +51,13 @@ struct GridView: View {
 
     // Settings sheet
     @State private var showSettings: Bool = false
+
+    // Phase prompt and builder
+    @State private var showPhasePrompt: Bool = false
+    @State private var showPhaseBuilder: Bool = false
+
+    // Mode label flash
+    @State private var showModeLabel: Bool = false
 
     private let weeksPerRow: Int = 52
     private let revealDuration: Double = 2.0
@@ -66,6 +81,79 @@ struct GridView: View {
             guard let rating = week.rating else { return nil }
             return (week.weekNumber, rating)
         })
+    }
+
+    // Rebuild phase colors cache from phases data
+    // Only includes weeks up to current week (phases don't color the future)
+    private func rebuildPhaseColorsCache() {
+        var cache: [Int: String] = [:]
+        let birthYear = user.birthYear
+        let currentWeek = currentWeekNumber
+
+        for phase in phases {
+            let startWeek = phase.startWeek(birthYear: birthYear)
+            // Cap end week at current week - phases only color lived weeks
+            let endWeek = min(phase.endWeek(birthYear: birthYear), currentWeek)
+
+            guard startWeek <= endWeek else { continue }
+
+            for weekNum in startWeek...endWeek {
+                cache[weekNum] = phase.colorHex
+            }
+        }
+
+        phaseColorsCache = cache
+    }
+
+    // OPTIMIZATION: Pre-compute all grid colors for the current view mode
+    // This runs once when mode changes, then Canvas just reads from array
+    private func rebuildGridColorsCache() {
+        var colors: [Color] = []
+        colors.reserveCapacity(totalWeeks)
+
+        let lived = weeksLived
+        let current = currentWeekNumber
+        let mode = currentViewMode
+
+        for weekNumber in 1...totalWeeks {
+            let isLived = weekNumber <= lived
+            let isCurrent = weekNumber == current
+
+            let color: Color
+            switch mode {
+            case .quality:
+                if let rating = ratedWeeksCache[weekNumber] {
+                    color = Color.ratingColor(for: rating)
+                } else if isCurrent {
+                    color = .weekCurrent
+                } else if isLived {
+                    color = .gridFilled
+                } else {
+                    color = .gridUnfilled
+                }
+            case .chapters:
+                if isCurrent {
+                    color = .weekCurrent
+                } else if let phaseHex = phaseColorsCache[weekNumber] {
+                    color = Color.fromHex(phaseHex)
+                } else if isLived {
+                    color = .gridFilled
+                } else {
+                    color = .gridUnfilled
+                }
+            case .focus:
+                if isCurrent {
+                    color = .weekCurrent
+                } else if isLived {
+                    color = .gridFilled
+                } else {
+                    color = .gridUnfilled
+                }
+            }
+            colors.append(color)
+        }
+
+        gridColorsCache = colors
     }
 
     private var totalWeeks: Int { user.totalWeeks }
@@ -125,6 +213,27 @@ struct GridView: View {
                     .padding(.top, 24)
                 }
 
+                // Mode label flash + Dot indicator
+                if hasRevealCompleted {
+                    VStack(spacing: 8) {
+                        // Mode label (flashes on change)
+                        if showModeLabel {
+                            Text(currentViewMode.displayName)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Color.textPrimary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.bgPrimary.opacity(0.8))
+                                .cornerRadius(6)
+                                .transition(.opacity)
+                        }
+
+                        DotIndicator(currentMode: currentViewMode)
+                    }
+                    .padding(.top, 12)
+                    .transition(.opacity)
+                }
+
                 // Timeline Scrubber - Fixed at bottom, outside ScrollView
                 // OPTIMIZATION: Isolated view to prevent state changes from invalidating grid
                 if hasRevealCompleted {
@@ -155,12 +264,21 @@ struct GridView: View {
             }
             // Initial cache build
             rebuildRatedWeeksCache()
-            // Sync color mode with user settings
-            isColorMode = user.colorModeEnabled
+            rebuildPhaseColorsCache()
+            // Sync view mode with user settings
+            currentViewMode = user.currentViewMode
+            // Build grid colors cache
+            rebuildGridColorsCache()
         }
         .onChange(of: weeks.count) { _, _ in
             // Rebuild cache when weeks change (new week marked)
             rebuildRatedWeeksCache()
+            rebuildGridColorsCache()
+        }
+        .onChange(of: phases.count) { _, _ in
+            // Rebuild phase cache when phases change
+            rebuildPhaseColorsCache()
+            rebuildGridColorsCache()
         }
         .sheet(item: $selectedWeekForDetail) { weekId in
             let weekNumberToCheck = weekId.value
@@ -187,6 +305,19 @@ struct GridView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView(user: user)
+        }
+        .sheet(isPresented: $showPhaseBuilder) {
+            PhaseFlowCoordinator(user: user, isPresented: $showPhaseBuilder)
+        }
+        .overlay {
+            if showPhasePrompt {
+                PhasePromptOverlay(
+                    user: user,
+                    isPresented: $showPhasePrompt,
+                    showPhaseBuilder: $showPhaseBuilder
+                )
+                .transition(.opacity)
+            }
         }
     }
 
@@ -237,6 +368,26 @@ struct GridView: View {
 
             }
             .frame(width: gridWidth, height: gridHeight)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 50)
+                    .onEnded { value in
+                        // CRAFT_SPEC: Swipe left/right to change view modes
+                        let horizontalAmount = value.translation.width
+                        let verticalAmount = value.translation.height
+
+                        // Only trigger if horizontal swipe is dominant
+                        guard abs(horizontalAmount) > abs(verticalAmount) else { return }
+
+                        if horizontalAmount < -50 {
+                            // Swipe left → next mode
+                            swipeToNextMode()
+                        } else if horizontalAmount > 50 {
+                            // Swipe right → previous mode
+                            swipeToPreviousMode()
+                        }
+                    }
+            )
 
             // Right age labels
             VStack(alignment: .leading, spacing: 0) {
@@ -264,34 +415,27 @@ struct GridView: View {
         gridWidth: CGFloat,
         gridHeight: CGFloat
     ) -> some View {
-        ZStack(alignment: .topLeading) {
-            // Grid canvas - color is determined directly, no post-processing
+        // Capture cache locally to avoid closure capturing self
+        let colors = gridColorsCache
+        let total = totalWeeks
+        let perRow = weeksPerRow
+
+        return ZStack(alignment: .topLeading) {
+            // OPTIMIZATION: Canvas reads from pre-computed color array
+            // No state dependencies inside closure = no recomputation on state change
             Canvas { context, _ in
-                for weekNumber in 1...totalWeeks {
-                    let row = (weekNumber - 1) / weeksPerRow
-                    let col = (weekNumber - 1) % weeksPerRow
+                guard colors.count == total else { return }
+
+                for weekNumber in 1...total {
+                    let index = weekNumber - 1
+                    let row = index / perRow
+                    let col = index % perRow
                     let x = CGFloat(col) * (cellSize + spacing)
                     let y = CGFloat(row) * (cellSize + spacing)
                     let rect = CGRect(x: x, y: y, width: cellSize, height: cellSize)
                     let circle = Path(ellipseIn: rect)
 
-                    let isLived = weekNumber <= weeksLived
-                    let isCurrent = weekNumber == currentWeekNumber
-
-                    // Determine color based on mode
-                    let color: Color
-                    if isColorMode, let rating = ratedWeeksCache[weekNumber] {
-                        // Color mode: show rating colors
-                        color = Color.ratingColor(for: rating)
-                    } else if isCurrent {
-                        color = .weekCurrent
-                    } else if isLived {
-                        color = .gridFilled
-                    } else {
-                        color = .gridUnfilled
-                    }
-
-                    context.fill(circle, with: .color(color))
+                    context.fill(circle, with: .color(colors[index]))
                 }
             }
             .frame(width: gridWidth, height: gridHeight)
@@ -459,6 +603,16 @@ struct GridView: View {
             hasRevealCompleted = true
             HapticService.shared.heavy()
             AudioService.shared.playTap()
+
+            // CRAFT_SPEC: Phase prompt 1s after Reveal completes
+            // Only show if user hasn't seen it and has no phases
+            if !user.hasSeenPhasePrompt && phases.isEmpty {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    withAnimation(.smooth(duration: 0.3)) {
+                        showPhasePrompt = true
+                    }
+                }
+            }
         }
     }
 
@@ -504,14 +658,14 @@ struct GridView: View {
 
             Spacer()
 
-            // Color mode toggle
+            // View mode toggle button
             if hasRevealCompleted {
                 Button {
-                    toggleColorMode()
+                    cycleViewMode()
                 } label: {
-                    Image(systemName: isColorMode ? "paintpalette.fill" : "paintpalette")
+                    Image(systemName: viewModeIcon)
                         .font(.system(size: 20))
-                        .foregroundStyle(isColorMode ? Color.textPrimary : Color.textTertiary)
+                        .foregroundStyle(currentViewMode == .focus ? Color.textTertiary : Color.textPrimary)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
@@ -525,12 +679,50 @@ struct GridView: View {
         .padding(.horizontal, 8)
     }
 
-    // MARK: - Color Mode Toggle
+    // MARK: - View Mode
 
-    private func toggleColorMode() {
-        HapticService.shared.medium()
-        isColorMode.toggle()
-        user.colorModeEnabled = isColorMode
+    private var viewModeIcon: String {
+        switch currentViewMode {
+        case .chapters: return "book.pages"
+        case .quality: return "paintpalette.fill"
+        case .focus: return "circle.grid.3x3"
+        }
+    }
+
+    private func cycleViewMode() {
+        HapticService.shared.light()
+        currentViewMode = currentViewMode.next
+        user.currentViewMode = currentViewMode
+        rebuildGridColorsCache()
+        flashModeLabel()
+    }
+
+    private func swipeToNextMode() {
+        HapticService.shared.light()
+        currentViewMode = currentViewMode.next
+        user.currentViewMode = currentViewMode
+        rebuildGridColorsCache()
+        flashModeLabel()
+    }
+
+    private func swipeToPreviousMode() {
+        HapticService.shared.light()
+        currentViewMode = currentViewMode.previous
+        user.currentViewMode = currentViewMode
+        rebuildGridColorsCache()
+        flashModeLabel()
+    }
+
+    // CRAFT_SPEC: Mode label flash - fade in 0.1s, hold 0.5s, fade out 0.2s (total 0.8s)
+    private func flashModeLabel() {
+        withAnimation(.easeOut(duration: 0.1)) {
+            showModeLabel = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            withAnimation(.easeOut(duration: 0.2)) {
+                showModeLabel = false
+            }
+        }
     }
 
     // MARK: - Week Confirm Bloom Animation
