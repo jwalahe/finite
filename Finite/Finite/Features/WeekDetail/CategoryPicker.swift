@@ -13,7 +13,7 @@ struct CategoryPicker: View {
     // CRAFT_SPEC: Icon size 24pt, touch target 48pt, spacing 12pt
     private let iconSize: CGFloat = 24
     private let touchTarget: CGFloat = 48
-    private let spacing: CGFloat = 8
+    private let spacing: CGFloat = 12
 
     var body: some View {
         HStack(spacing: spacing) {

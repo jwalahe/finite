@@ -33,10 +33,19 @@ struct GridView: View {
     // Scrubber state - isolated to prevent cascade
     @State private var isScrubbing: Bool = false
 
+    // Color mode state
+    @State private var isColorMode: Bool = true
+
+    // Week confirm bloom animation
+    @State private var bloomWeekNumber: Int?
+    @State private var bloomProgress: CGFloat = 0.0
+    @State private var isBloomAnimating: Bool = false
+
     private let weeksPerRow: Int = 52
     private let revealDuration: Double = 2.0
-    private let screenMargin: CGFloat = 16
-    private let ageLabelWidth: CGFloat = 28
+    // CRAFT_SPEC: Screen margins 24pt
+    private let screenMargin: CGFloat = 24
+    private let ageLabelWidth: CGFloat = 24
 
     init(user: User, shouldReveal: Bool = false) {
         self.user = user
@@ -64,6 +73,7 @@ struct GridView: View {
     private var isCurrentWeekMarked: Bool {
         ratedWeeksCache[currentWeekNumber] != nil
     }
+
 
     // Dynamic cell sizing based on available width
     private func calculateGridMetrics(for screenWidth: CGFloat) -> (cellSize: CGFloat, spacing: CGFloat, gridWidth: CGFloat) {
@@ -142,12 +152,16 @@ struct GridView: View {
             }
             // Initial cache build
             rebuildRatedWeeksCache()
+            // Sync color mode with user settings
+            isColorMode = user.colorModeEnabled
         }
         .onChange(of: weeks.count) { _, _ in
             // Rebuild cache when weeks change (new week marked)
             rebuildRatedWeeksCache()
         }
         .sheet(item: $selectedWeekForDetail) { weekId in
+            let weekNumberToCheck = weekId.value
+
             WeekDetailSheet(
                 user: user,
                 weekNumber: weekId.value,
@@ -158,6 +172,14 @@ struct GridView: View {
             .onDisappear {
                 // Rebuild cache after sheet dismisses (week may have been updated)
                 rebuildRatedWeeksCache()
+
+                // Trigger bloom animation if week was newly rated or updated
+                // Small delay to let cache rebuild complete
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    if ratedWeeksCache[weekNumberToCheck] != nil {
+                        triggerBloomAnimation(for: weekNumberToCheck)
+                    }
+                }
             }
         }
     }
@@ -237,7 +259,7 @@ struct GridView: View {
         gridHeight: CGFloat
     ) -> some View {
         ZStack(alignment: .topLeading) {
-            // Grid canvas
+            // Grid canvas - color is determined directly, no post-processing
             Canvas { context, _ in
                 for weekNumber in 1...totalWeeks {
                     let row = (weekNumber - 1) / weeksPerRow
@@ -250,9 +272,10 @@ struct GridView: View {
                     let isLived = weekNumber <= weeksLived
                     let isCurrent = weekNumber == currentWeekNumber
 
-                    // Don't skip current week - we'll draw it in the canvas too
+                    // Determine color based on mode
                     let color: Color
-                    if let rating = ratedWeeksCache[weekNumber] {
+                    if isColorMode, let rating = ratedWeeksCache[weekNumber] {
+                        // Color mode: show rating colors
                         color = Color.ratingColor(for: rating)
                     } else if isCurrent {
                         color = .weekCurrent
@@ -271,10 +294,58 @@ struct GridView: View {
             // Current week pulse ring (more visible)
             currentWeekPulseRing(cellSize: cellSize, spacing: spacing)
 
+            // Bloom animation overlay (when a week is confirmed)
+            if let bloomWeek = bloomWeekNumber {
+                bloomRingOverlay(weekNumber: bloomWeek, cellSize: cellSize, spacing: spacing)
+            }
+
             // Tap gesture for current week quick access
             currentWeekTapTarget(cellSize: cellSize, spacing: spacing)
         }
         .frame(width: gridWidth, height: gridHeight)
+    }
+
+    // MARK: - Bloom Ring Overlay (Week Confirm Animation)
+
+    private func bloomRingOverlay(weekNumber: Int, cellSize: CGFloat, spacing: CGFloat) -> some View {
+        let row = (weekNumber - 1) / weeksPerRow
+        let col = (weekNumber - 1) % weeksPerRow
+        let x = CGFloat(col) * (cellSize + spacing) + cellSize / 2
+        let y = CGFloat(row) * (cellSize + spacing) + cellSize / 2
+
+        // Get the rating color for this week
+        let rating = ratedWeeksCache[weekNumber] ?? 3
+        let color = Color.ratingColor(for: rating)
+
+        // Bloom expands from cell size to larger radius
+        let maxRadius: CGFloat = 80
+        let currentRadius = cellSize / 2 + (maxRadius * bloomProgress)
+        let opacity = 0.8 * (1.0 - bloomProgress) // Fades out as it expands
+
+        return ZStack {
+            // Outer expanding ring
+            Circle()
+                .stroke(color.opacity(opacity * 0.5), lineWidth: 3)
+                .frame(width: currentRadius * 2, height: currentRadius * 2)
+                .position(x: x, y: y)
+
+            // Inner glow
+            Circle()
+                .fill(
+                    RadialGradient(
+                        gradient: Gradient(colors: [
+                            color.opacity(opacity * 0.6),
+                            color.opacity(0)
+                        ]),
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: currentRadius
+                    )
+                )
+                .frame(width: currentRadius * 2, height: currentRadius * 2)
+                .position(x: x, y: y)
+        }
+        .allowsHitTesting(false)
     }
 
     // MARK: - Current Week Pulse Ring (More Visible)
@@ -388,20 +459,80 @@ struct GridView: View {
     // MARK: - Header
 
     private var headerView: some View {
-        VStack(spacing: 8) {
-            Text("Finite")
-                .font(.system(size: 24, weight: .light))
-                .tracking(2)
-                .foregroundStyle(Color.textPrimary)
+        HStack {
+            // Spacer for balance
+            Color.clear
+                .frame(width: 44, height: 44)
 
+            Spacer()
+
+            VStack(spacing: 8) {
+                Text("Finite")
+                    .font(.system(size: 24, weight: .light))
+                    .tracking(2)
+                    .foregroundStyle(Color.textPrimary)
+
+                if hasRevealCompleted {
+                    Text("\(user.weeksRemaining.formatted()) weeks remaining")
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeIn(duration: 0.5), value: hasRevealCompleted)
+
+            Spacer()
+
+            // Color mode toggle
             if hasRevealCompleted {
-                Text("\(user.weeksRemaining.formatted()) weeks remaining")
-                    .font(.caption)
-                    .foregroundStyle(Color.textSecondary)
-                    .transition(.opacity)
+                Button {
+                    toggleColorMode()
+                } label: {
+                    Image(systemName: isColorMode ? "paintpalette.fill" : "paintpalette")
+                        .font(.system(size: 20))
+                        .foregroundStyle(isColorMode ? Color.textPrimary : Color.textTertiary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .transition(.opacity)
+            } else {
+                Color.clear
+                    .frame(width: 44, height: 44)
             }
         }
-        .animation(.easeIn(duration: 0.5), value: hasRevealCompleted)
+        .padding(.horizontal, 8)
+    }
+
+    // MARK: - Color Mode Toggle
+
+    private func toggleColorMode() {
+        HapticService.shared.medium()
+        isColorMode.toggle()
+        user.colorModeEnabled = isColorMode
+    }
+
+    // MARK: - Week Confirm Bloom Animation
+    // CRAFT_SPEC: Week cell mark - 0.25s duration, 0.15 bounce, .snappy
+
+    private func triggerBloomAnimation(for weekNumber: Int) {
+        guard !isBloomAnimating else { return }
+
+        bloomWeekNumber = weekNumber
+        bloomProgress = 0.0
+        isBloomAnimating = true
+
+        // CRAFT_SPEC: Color bloom on confirm - snappy with bounce
+        withAnimation(.snappy(duration: 0.25, extraBounce: 0.15)) {
+            bloomProgress = 1.0
+        }
+
+        // Clean up after animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            bloomWeekNumber = nil
+            bloomProgress = 0.0
+            isBloomAnimating = false
+        }
     }
 
     // MARK: - Animated Grid
