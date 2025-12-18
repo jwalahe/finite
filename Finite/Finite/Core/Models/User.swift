@@ -18,6 +18,7 @@ final class User {
     var dailyNotificationTime: Date
     var lifeExpectancy: Int
     var currentViewModeRaw: String
+    var milestoneAlertsEnabled: Bool
 
     // State tracking
     var hasSeenReveal: Bool
@@ -31,6 +32,7 @@ final class User {
         self.dailyNotificationTime = Calendar.current.date(from: DateComponents(hour: 8, minute: 0)) ?? Date()
         self.lifeExpectancy = 80
         self.currentViewModeRaw = ViewMode.chapters.rawValue
+        self.milestoneAlertsEnabled = true
         self.hasSeenReveal = false
         self.hasSeenPhasePrompt = false
         self.hasSeenSwipeHint = false

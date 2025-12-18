@@ -183,4 +183,10 @@ final class NotificationService {
             self.notificationCenter.removePendingNotificationRequests(withIdentifiers: milestoneIds)
         }
     }
+
+    /// Cancel all notifications (daily + milestones)
+    func cancelAll() {
+        notificationCenter.removeAllPendingNotificationRequests()
+        notificationCenter.removeAllDeliveredNotifications()
+    }
 }
