@@ -2,15 +2,15 @@
 //  WalkthroughOverlay.swift
 //  Finite
 //
-//  Main coordinator view for the interactive walkthrough
-//  Philosophy: Learn by doing, not reading
+//  Minimal, calm walkthrough overlay
+//  Philosophy: Guide without distracting
 //
 
 import SwiftUI
 
 struct WalkthroughOverlay: View {
     @ObservedObject var walkthrough: WalkthroughService
-    let onPhasePrompt: () -> Void  // Triggers phase modal
+    let onPhasePrompt: () -> Void
 
     var body: some View {
         ZStack {
@@ -23,176 +23,92 @@ struct WalkthroughOverlay: View {
                     dotIndicatorFrame: walkthrough.dotIndicatorFrame
                 )
                 .ignoresSafeArea()
-                .allowsHitTesting(spotlightBlocksTouches(for: step))
+                .allowsHitTesting(!step.requiresUserAction)  // Let touches through for action steps
                 .onTapGesture {
-                    handleBackgroundTap(for: step)
+                    handleTap(for: step)
                 }
 
-                // Coach mark (tooltip)
+                // Coach mark (text only, no background)
                 CoachMark(
                     step: step,
-                    targetFrame: targetFrame(for: step),
+                    gridFrame: walkthrough.gridFrame,
                     onTap: { handleTap(for: step) }
                 )
 
-                // Gesture hint (animated hand)
-                if let gestureType = gestureType(for: step) {
-                    GestureHint(
-                        type: gestureType,
-                        position: gesturePosition(for: step)
-                    )
-                }
-
-                // Pulse ring around target
-                if let pulseFrame = spotlightFrame(for: step), step.requiresUserAction {
-                    PulseRing(frame: pulseFrame)
-                }
-
-                // Skip button
+                // Skip button (minimal)
                 if walkthrough.canSkip {
                     VStack {
                         HStack {
                             Spacer()
-                            SkipButton {
+                            Button {
                                 walkthrough.skip()
+                            } label: {
+                                Text("Skip")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.5))
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
                             }
-                            .padding(.trailing, 24)
-                            .padding(.top, 60)
+                            .padding(.trailing, 16)
+                            .padding(.top, 56)
                         }
                         Spacer()
                     }
                 }
 
-                // Progress indicator
+                // Minimal progress dots
                 if step != .complete {
                     VStack {
                         Spacer()
-                        WalkthroughProgressDots(
-                            totalSteps: WalkthroughStep.allCases.count - 1,  // Exclude .complete
-                            currentStep: step.rawValue
-                        )
-                        .padding(.bottom, 40)
+                        HStack(spacing: 6) {
+                            ForEach(0..<6, id: \.self) { index in
+                                Circle()
+                                    .fill(index <= step.rawValue ? Color.white : Color.white.opacity(0.3))
+                                    .frame(width: 5, height: 5)
+                            }
+                        }
+                        .padding(.bottom, 50)
                     }
                 }
             }
-
-            // Celebration burst
-            if walkthrough.showCelebration {
-                CelebrationBurst()
-            }
         }
-        .animation(.easeOut(duration: 0.3), value: walkthrough.currentStep)
+        .allowsHitTesting(walkthrough.isActive)
     }
 
     // MARK: - Tap Handling
 
     private func handleTap(for step: WalkthroughStep) {
         switch step {
-        case .gridIntro, .chaptersExplanation:
+        case .gridIntro:
+            // Tap anywhere advances
+            walkthrough.advance()
+
+        case .currentWeek:
+            // Need to tap the actual current week - let touch through
+            // The GridView will call walkthrough.handleCurrentWeekTapped()
+            break
+
+        case .viewModesIntro:
+            // Need to swipe - let touch through
+            // The GridView will call walkthrough.handleViewModeChanged()
+            break
+
+        case .chaptersExplanation:
             // Tap anywhere advances
             walkthrough.advance()
 
         case .addPhase:
-            // Trigger phase prompt modal
+            // Open phase builder
             onPhasePrompt()
 
-        default:
-            // Other steps require specific user action
+        case .markWeek:
+            // Need to long-press a week - let touch through
+            // The GridView will call walkthrough.handleWeekMarked()
             break
-        }
-    }
 
-    private func handleBackgroundTap(for step: WalkthroughStep) {
-        // For non-action steps, tapping background advances
-        if !step.requiresUserAction {
-            walkthrough.advance()
-        }
-    }
-
-    // MARK: - Frame Helpers
-
-    private func targetFrame(for step: WalkthroughStep) -> CGRect {
-        switch step {
-        case .gridIntro:
-            return walkthrough.gridFrame
-        case .currentWeek:
-            return walkthrough.currentWeekFrame
-        case .viewModesIntro:
-            return walkthrough.dotIndicatorFrame
-        case .chaptersExplanation:
-            return walkthrough.gridFrame
-        case .addPhase:
-            return .zero  // Modal handles its own positioning
-        case .markWeek:
-            // Target a filled week region
-            return CGRect(
-                x: walkthrough.currentWeekFrame.midX - 80,
-                y: walkthrough.currentWeekFrame.midY - 30,
-                width: 80,
-                height: 60
-            )
         case .complete:
-            return .zero
-        }
-    }
-
-    private func spotlightFrame(for step: WalkthroughStep) -> CGRect? {
-        switch step {
-        case .currentWeek:
-            return walkthrough.currentWeekFrame.insetBy(dx: -20, dy: -20)
-        case .viewModesIntro:
-            return walkthrough.dotIndicatorFrame.insetBy(dx: -30, dy: -20)
-        case .markWeek:
-            // Spotlight a region of filled weeks
-            return CGRect(
-                x: max(walkthrough.gridFrame.minX, walkthrough.currentWeekFrame.minX - 100),
-                y: max(walkthrough.gridFrame.minY, walkthrough.currentWeekFrame.minY - 40),
-                width: 120,
-                height: 80
-            )
-        default:
-            return nil
-        }
-    }
-
-    private func spotlightBlocksTouches(for step: WalkthroughStep) -> Bool {
-        // Block touches on dimmed area for steps that require specific target
-        switch step {
-        case .currentWeek, .markWeek:
-            return false  // Allow touches through to grid
-        default:
-            return true  // Block touches, handle in overlay
-        }
-    }
-
-    private func gestureType(for step: WalkthroughStep) -> GestureHintType? {
-        switch step {
-        case .currentWeek: return .tap
-        case .viewModesIntro: return .swipeLeft
-        case .markWeek: return .longPress
-        default: return nil
-        }
-    }
-
-    private func gesturePosition(for step: WalkthroughStep) -> CGPoint {
-        switch step {
-        case .currentWeek:
-            return CGPoint(
-                x: walkthrough.currentWeekFrame.midX,
-                y: walkthrough.currentWeekFrame.midY + 60
-            )
-        case .viewModesIntro:
-            return CGPoint(
-                x: walkthrough.gridFrame.midX,
-                y: walkthrough.gridFrame.midY
-            )
-        case .markWeek:
-            return CGPoint(
-                x: walkthrough.currentWeekFrame.midX - 60,
-                y: walkthrough.currentWeekFrame.midY + 40
-            )
-        default:
-            return .zero
+            // Auto-dismisses, but allow tap to dismiss early
+            walkthrough.skip()
         }
     }
 }

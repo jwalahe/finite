@@ -3,6 +3,7 @@
 //  Finite
 //
 //  Dimmed overlay with spotlight cutout for walkthrough
+//  Uses mask modifier for proper cutout rendering
 //
 
 import SwiftUI
@@ -14,83 +15,76 @@ struct SpotlightMask: View {
     let dotIndicatorFrame: CGRect
 
     var body: some View {
-        GeometryReader { geometry in
-            Canvas { context, size in
-                // Fill entire canvas with dim color
-                context.fill(
-                    Path(CGRect(origin: .zero, size: size)),
-                    with: .color(.black.opacity(dimOpacity))
-                )
-
-                // Cut out spotlight area if applicable
-                if let spotlightRect = spotlightRect {
-                    context.blendMode = .destinationOut
-
-                    let cornerRadius = spotlightCornerRadius
-                    let spotlightPath = Path(
-                        roundedRect: spotlightRect,
-                        cornerRadius: cornerRadius
-                    )
-                    context.fill(spotlightPath, with: .color(.white))
+        // Semi-transparent overlay with cutout
+        Rectangle()
+            .fill(Color.black.opacity(dimOpacity))
+            .reverseMask {
+                if let spotlight = spotlightRect {
+                    RoundedRectangle(cornerRadius: spotlightCornerRadius)
+                        .frame(width: spotlight.width, height: spotlight.height)
+                        .position(x: spotlight.midX, y: spotlight.midY)
                 }
             }
-        }
-        .animation(.easeOut(duration: 0.4), value: step)
+            .animation(.easeOut(duration: 0.3), value: step)
     }
 
     // MARK: - Computed
 
     private var dimOpacity: Double {
         switch step {
-        case .complete: return 0.85  // Darker for finale
-        default: return 0.75
+        case .complete: return 0.9
+        default: return 0.8
         }
     }
 
     private var spotlightRect: CGRect? {
         switch step {
         case .gridIntro:
-            // Large spotlight on entire grid
-            return gridFrame.insetBy(dx: -16, dy: -16)
+            // Spotlight entire grid
+            return gridFrame.insetBy(dx: -12, dy: -12)
 
         case .currentWeek:
-            // Small spotlight on current week
-            return currentWeekFrame.insetBy(dx: -24, dy: -24)
+            // Small circular spotlight on current week
+            guard currentWeekFrame != .zero else { return nil }
+            return currentWeekFrame.insetBy(dx: -20, dy: -20)
 
         case .viewModesIntro:
-            // Spotlight on dot indicator + nearby grid area
-            let indicatorSpotlight = dotIndicatorFrame.insetBy(dx: -40, dy: -20)
-            let gridBottom = CGRect(
-                x: gridFrame.minX,
-                y: gridFrame.maxY - 100,
-                width: gridFrame.width,
-                height: 100
-            )
-            return indicatorSpotlight.union(gridBottom)
+            // Spotlight the grid area for swiping
+            return gridFrame.insetBy(dx: -12, dy: -12)
 
         case .chaptersExplanation:
-            // Spotlight on grid (showing colors)
-            return gridFrame.insetBy(dx: -16, dy: -16)
+            // Spotlight grid showing phase colors
+            return gridFrame.insetBy(dx: -12, dy: -12)
 
         case .markWeek:
-            // Spotlight on a region of filled weeks (left of current week)
-            let targetArea = CGRect(
-                x: max(gridFrame.minX, currentWeekFrame.minX - 120),
-                y: max(gridFrame.minY, currentWeekFrame.minY - 60),
-                width: 160,
-                height: 120
-            )
-            return targetArea
+            // Spotlight a region of the grid for long-press
+            guard currentWeekFrame != .zero && gridFrame != .zero else { return nil }
+            return gridFrame.insetBy(dx: -12, dy: -12)
 
         case .addPhase, .complete:
-            return nil  // No spotlight
+            return nil  // Full dim, no spotlight
         }
     }
 
     private var spotlightCornerRadius: CGFloat {
         switch step {
-        case .currentWeek: return 50  // Circular for single week
-        default: return 16
+        case .currentWeek: return 100  // Circular
+        default: return 12
         }
+    }
+}
+
+// MARK: - Reverse Mask Extension
+
+extension View {
+    @ViewBuilder
+    func reverseMask<Mask: View>(@ViewBuilder _ mask: () -> Mask) -> some View {
+        self.mask(
+            Rectangle()
+                .overlay(
+                    mask()
+                        .blendMode(.destinationOut)
+                )
+        )
     }
 }

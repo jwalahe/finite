@@ -2,68 +2,60 @@
 //  CoachMark.swift
 //  Finite
 //
-//  Tooltip bubble for walkthrough guidance
+//  Minimal tooltip for walkthrough guidance
+//  Matches app's contemplative aesthetic - no flashy materials
 //
 
 import SwiftUI
 
-enum TooltipPosition {
-    case above, below, left, right, center
-}
-
 struct CoachMark: View {
     let step: WalkthroughStep
-    let targetFrame: CGRect
+    let gridFrame: CGRect
     let onTap: () -> Void
 
     @State private var isVisible = false
 
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 12) {
+            VStack(spacing: 16) {
                 // Title
                 Text(step.title)
-                    .font(.title3.weight(.bold))
+                    .font(.system(size: 28, weight: .light))
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
 
                 // Message
                 Text(step.message)
-                    .font(.body)
-                    .foregroundStyle(.white.opacity(0.9))
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.8))
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
 
-                // Action hint
+                // Action hint (subtle)
                 if let hint = step.actionHint {
                     Text(hint)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
                         .padding(.top, 8)
                 }
             }
-            .padding(24)
-            .frame(maxWidth: 300)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-                    .environment(\.colorScheme, .dark)
-            )
+            .padding(.horizontal, 32)
+            .frame(maxWidth: 320)
             .position(tooltipPosition(in: geometry.size))
             .opacity(isVisible ? 1 : 0)
-            .scaleEffect(isVisible ? 1 : 0.9)
+            .offset(y: isVisible ? 0 : 10)
             .onAppear {
-                withAnimation(.easeOut(duration: 0.3).delay(0.1)) {
+                withAnimation(.easeOut(duration: 0.4).delay(0.2)) {
                     isVisible = true
                 }
             }
             .onChange(of: step) { _, _ in
-                // Reset animation for new step
                 isVisible = false
-                withAnimation(.easeOut(duration: 0.3).delay(0.1)) {
+                withAnimation(.easeOut(duration: 0.4).delay(0.15)) {
                     isVisible = true
                 }
             }
+            .contentShape(Rectangle())
             .onTapGesture {
                 if !step.requiresUserAction {
                     onTap()
@@ -73,35 +65,25 @@ struct CoachMark: View {
     }
 
     private func tooltipPosition(in screenSize: CGSize) -> CGPoint {
-        let position = calculatePosition(for: step, screenSize: screenSize)
-
-        switch position {
-        case .center:
-            return CGPoint(x: screenSize.width / 2, y: screenSize.height / 2)
-        case .above:
-            return CGPoint(
-                x: min(max(targetFrame.midX, 160), screenSize.width - 160),
-                y: max(120, targetFrame.minY - 120)
-            )
-        case .below:
-            return CGPoint(
-                x: min(max(targetFrame.midX, 160), screenSize.width - 160),
-                y: min(screenSize.height - 120, targetFrame.maxY + 120)
-            )
-        default:
-            return CGPoint(x: screenSize.width / 2, y: screenSize.height / 2)
-        }
-    }
-
-    private func calculatePosition(for step: WalkthroughStep, screenSize: CGSize) -> TooltipPosition {
         switch step {
-        case .gridIntro: return .center
-        case .currentWeek: return targetFrame.midY > screenSize.height / 2 ? .above : .below
-        case .viewModesIntro: return .above
-        case .chaptersExplanation: return .center
-        case .addPhase: return .center
-        case .markWeek: return targetFrame.midY > screenSize.height / 2 ? .above : .below
-        case .complete: return .center
+        case .gridIntro, .chaptersExplanation, .addPhase, .complete:
+            // Center of screen
+            return CGPoint(x: screenSize.width / 2, y: screenSize.height / 2)
+
+        case .currentWeek:
+            // Above or below the grid depending on where current week is
+            let gridMidY = gridFrame.midY
+            if gridMidY < screenSize.height / 2 {
+                // Grid is in top half, put tooltip below
+                return CGPoint(x: screenSize.width / 2, y: gridFrame.maxY + 80)
+            } else {
+                // Grid is in bottom half, put tooltip above
+                return CGPoint(x: screenSize.width / 2, y: gridFrame.minY - 80)
+            }
+
+        case .viewModesIntro, .markWeek:
+            // Position above the grid
+            return CGPoint(x: screenSize.width / 2, y: gridFrame.minY - 60)
         }
     }
 }
