@@ -13,6 +13,7 @@ struct SpotlightMask: View {
     let gridFrame: CGRect
     let currentWeekFrame: CGRect
     let dotIndicatorFrame: CGRect
+    let spineFrame: CGRect
 
     var body: some View {
         // Semi-transparent overlay with cutout
@@ -55,6 +56,11 @@ struct SpotlightMask: View {
         case .explainChapters:
             // Spotlight grid to show chapter colors
             return gridFrame.insetBy(dx: -12, dy: -12)
+
+        case .tapSpine:
+            // Spotlight the timeline spine on the left
+            guard spineFrame != .zero else { return gridFrame.insetBy(dx: -12, dy: -12) }
+            return spineFrame.insetBy(dx: -8, dy: -8)
 
         case .markWeek:
             // Spotlight the grid for long-press

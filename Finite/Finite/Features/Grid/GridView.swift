@@ -418,6 +418,17 @@ struct GridView: View {
                 TimeSpine(user: user, phases: phases, gridHeight: gridHeight) { phase, yPos in
                     handleSpineTap(phase: phase, yPosition: yPos)
                 }
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: SpineFrameKey.self,
+                            value: geo.frame(in: .global)
+                        )
+                    }
+                )
+                .onPreferenceChange(SpineFrameKey.self) { frame in
+                    walkthrough.spineFrame = frame
+                }
                 .transition(.opacity.combined(with: .move(edge: .leading)))
             }
 

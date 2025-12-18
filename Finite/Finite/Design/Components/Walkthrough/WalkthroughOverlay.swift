@@ -28,7 +28,8 @@ struct WalkthroughOverlay: View {
                     step: step,
                     gridFrame: walkthrough.gridFrame,
                     currentWeekFrame: walkthrough.currentWeekFrame,
-                    dotIndicatorFrame: walkthrough.dotIndicatorFrame
+                    dotIndicatorFrame: walkthrough.dotIndicatorFrame,
+                    spineFrame: walkthrough.spineFrame
                 )
                 .ignoresSafeArea()
 
@@ -65,7 +66,7 @@ struct WalkthroughOverlay: View {
                     VStack {
                         Spacer()
                         HStack(spacing: 6) {
-                            ForEach(0..<7, id: \.self) { index in
+                            ForEach(0..<8, id: \.self) { index in
                                 Circle()
                                     .fill(index <= step.rawValue ? Color.white : Color.white.opacity(0.3))
                                     .frame(width: 5, height: 5)
@@ -108,6 +109,10 @@ struct WalkthroughOverlay: View {
         case .addPhase:
             // Open the phase form
             onPhasePrompt()
+
+        case .tapSpine:
+            // Just informational - tap to continue
+            walkthrough.advance()
 
         case .swipeToQuality:
             // Touches pass through - grid handles swipe

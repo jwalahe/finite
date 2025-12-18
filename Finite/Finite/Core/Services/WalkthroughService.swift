@@ -17,9 +17,10 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
     case swipeToChapters = 2    // Swipe to Chapters view
     case explainChapters = 3    // Explain chapters concept (Chapters view)
     case addPhase = 4           // Add first chapter (Chapters view)
-    case swipeToQuality = 5     // Swipe to Quality view
-    case markWeek = 6           // Long-press to mark a week (Quality view)
-    case complete = 7
+    case tapSpine = 5           // Tap the spine to see phase details (Chapters view)
+    case swipeToQuality = 6     // Swipe to Quality view
+    case markWeek = 7           // Long-press to mark a week (Quality view)
+    case complete = 8
 
     var id: Int { rawValue }
 
@@ -30,6 +31,7 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
         case .swipeToChapters: return "Life Chapters"
         case .explainChapters: return "Color Your Past"
         case .addPhase: return "Add Your First Chapter"
+        case .tapSpine: return "The Timeline"
         case .swipeToQuality: return "Rate Your Weeks"
         case .markWeek: return "Try It Now"
         case .complete: return "You're Ready"
@@ -48,6 +50,8 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
             return "Chapters are phases of your life—school, career, adventures."
         case .addPhase:
             return "Tap anywhere to add your first chapter."
+        case .tapSpine:
+            return "Tap any color on the timeline to see that chapter's details."
         case .swipeToQuality:
             return "Swipe left once more to rate individual weeks."
         case .markWeek:
@@ -59,7 +63,7 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
 
     var requiresUserAction: Bool {
         switch self {
-        case .gridIntro, .currentWeekIntro, .explainChapters, .addPhase: return false  // Tap overlay
+        case .gridIntro, .currentWeekIntro, .explainChapters, .addPhase, .tapSpine: return false  // Tap overlay
         case .swipeToChapters, .swipeToQuality, .markWeek: return true  // Grid handles action
         case .complete: return false  // Auto-dismiss
         }
@@ -72,6 +76,7 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
         case .swipeToChapters: return "Swipe left"
         case .explainChapters: return "Tap to continue"
         case .addPhase: return "Tap to add"
+        case .tapSpine: return "Tap to continue"
         case .swipeToQuality: return "Swipe left"
         case .markWeek: return "Hold any filled week"
         case .complete: return nil
@@ -94,6 +99,7 @@ final class WalkthroughService: ObservableObject {
     @Published var gridFrame: CGRect = .zero
     @Published var currentWeekFrame: CGRect = .zero
     @Published var dotIndicatorFrame: CGRect = .zero
+    @Published var spineFrame: CGRect = .zero
 
     // MARK: - Persistence
     @AppStorage("hasCompletedWalkthrough") private var hasCompleted: Bool = false

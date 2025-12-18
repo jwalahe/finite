@@ -74,7 +74,7 @@ struct CoachMark: View {
             // Center of screen (no grid spotlight)
             return CGPoint(x: screenSize.width / 2, y: screenSize.height / 2)
 
-        case .gridIntro, .currentWeekIntro, .swipeToChapters, .explainChapters, .swipeToQuality, .markWeek:
+        case .gridIntro, .currentWeekIntro, .swipeToChapters, .explainChapters, .tapSpine, .swipeToQuality, .markWeek:
             // Position below the grid
             let belowGrid = gridFrame.maxY + 80
             let safeY = min(belowGrid, screenSize.height - safeBottom)
