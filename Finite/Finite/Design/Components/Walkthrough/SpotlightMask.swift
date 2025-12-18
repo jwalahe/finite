@@ -48,12 +48,12 @@ struct SpotlightMask: View {
             guard currentWeekFrame != .zero else { return gridFrame.insetBy(dx: -12, dy: -12) }
             return currentWeekFrame.insetBy(dx: -24, dy: -24)
 
-        case .swipeToQuality:
+        case .swipeToChapters, .swipeToQuality:
             // Spotlight the grid area for swiping
             return gridFrame.insetBy(dx: -12, dy: -12)
 
         case .explainChapters:
-            // Spotlight grid
+            // Spotlight grid to show chapter colors
             return gridFrame.insetBy(dx: -12, dy: -12)
 
         case .markWeek:

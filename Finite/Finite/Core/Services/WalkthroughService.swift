@@ -12,13 +12,14 @@ import Combine
 // MARK: - Walkthrough Step
 
 enum WalkthroughStep: Int, CaseIterable, Identifiable {
-    case gridIntro = 0          // Explain the grid
-    case currentWeekIntro = 1   // Point out the pulsing current week
-    case swipeToQuality = 2     // Swipe to Quality view
-    case explainChapters = 3    // Explain chapters concept
-    case addPhase = 4           // Add first chapter
-    case markWeek = 5           // Long-press to mark a week (with loupe)
-    case complete = 6
+    case gridIntro = 0          // Explain the grid (Focus view)
+    case currentWeekIntro = 1   // Point out the pulsing current week (Focus view)
+    case swipeToChapters = 2    // Swipe to Chapters view
+    case explainChapters = 3    // Explain chapters concept (Chapters view)
+    case addPhase = 4           // Add first chapter (Chapters view)
+    case swipeToQuality = 5     // Swipe to Quality view
+    case markWeek = 6           // Long-press to mark a week (Quality view)
+    case complete = 7
 
     var id: Int { rawValue }
 
@@ -26,10 +27,11 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
         switch self {
         case .gridIntro: return "Your Life in Weeks"
         case .currentWeekIntro: return "You Are Here"
-        case .swipeToQuality: return "Three Views"
-        case .explainChapters: return "Life Chapters"
+        case .swipeToChapters: return "Life Chapters"
+        case .explainChapters: return "Color Your Past"
         case .addPhase: return "Add Your First Chapter"
-        case .markWeek: return "Rate a Week"
+        case .swipeToQuality: return "Rate Your Weeks"
+        case .markWeek: return "Try It Now"
         case .complete: return "You're Ready"
         }
     }
@@ -40,14 +42,16 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
             return "Each dot is one week of your life.\nThe filled ones are behind you."
         case .currentWeekIntro:
             return "The glowing dot is this week."
-        case .swipeToQuality:
-            return "Swipe left to see your weeks in color."
+        case .swipeToChapters:
+            return "Swipe left to add color to your life."
         case .explainChapters:
-            return "Color your past by adding life chapters—school, career, adventures."
+            return "Chapters are phases of your life—school, career, adventures."
         case .addPhase:
-            return "Let's add your first chapter."
+            return "Tap anywhere to add your first chapter."
+        case .swipeToQuality:
+            return "Swipe left once more to rate individual weeks."
         case .markWeek:
-            return "Hold any week to rate it.\nA magnifier helps you find your spot."
+            return "Hold any filled week to rate it.\nA magnifier helps you find your spot."
         case .complete:
             return "Take your time. Reflect weekly.\nYour life is finite—make it count."
         }
@@ -55,8 +59,8 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
 
     var requiresUserAction: Bool {
         switch self {
-        case .gridIntro, .currentWeekIntro, .explainChapters: return false  // Tap anywhere
-        case .swipeToQuality, .addPhase, .markWeek: return true  // Specific action
+        case .gridIntro, .currentWeekIntro, .explainChapters, .addPhase: return false  // Tap overlay
+        case .swipeToChapters, .swipeToQuality, .markWeek: return true  // Grid handles action
         case .complete: return false  // Auto-dismiss
         }
     }
@@ -65,9 +69,10 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
         switch self {
         case .gridIntro: return "Tap to continue"
         case .currentWeekIntro: return "Tap to continue"
-        case .swipeToQuality: return "Swipe left"
+        case .swipeToChapters: return "Swipe left"
         case .explainChapters: return "Tap to continue"
-        case .addPhase: return nil  // Modal handles this
+        case .addPhase: return "Tap to add"
+        case .swipeToQuality: return "Swipe left"
         case .markWeek: return "Hold any filled week"
         case .complete: return nil
         }
@@ -185,8 +190,10 @@ final class WalkthroughService: ObservableObject {
     // MARK: - Action Detection
 
     func handleViewModeChanged(to mode: ViewMode) {
-        // Advance when user reaches Quality view
-        if currentStep == .swipeToQuality && mode == .quality {
+        // Advance when user reaches the expected view
+        if currentStep == .swipeToChapters && mode == .chapters {
+            advance()
+        } else if currentStep == .swipeToQuality && mode == .quality {
             advance()
         }
     }

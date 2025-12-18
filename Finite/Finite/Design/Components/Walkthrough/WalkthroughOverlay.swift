@@ -65,7 +65,7 @@ struct WalkthroughOverlay: View {
                     VStack {
                         Spacer()
                         HStack(spacing: 6) {
-                            ForEach(0..<6, id: \.self) { index in
+                            ForEach(0..<7, id: \.self) { index in
                                 Circle()
                                     .fill(index <= step.rawValue ? Color.white : Color.white.opacity(0.3))
                                     .frame(width: 5, height: 5)
@@ -96,10 +96,9 @@ struct WalkthroughOverlay: View {
             walkthrough.advance()
 
         case .currentWeekIntro:
-            // Tap to continue - just showing the pulsing week
             walkthrough.advance()
 
-        case .swipeToQuality:
+        case .swipeToChapters:
             // Touches pass through - grid handles swipe
             break
 
@@ -107,7 +106,12 @@ struct WalkthroughOverlay: View {
             walkthrough.advance()
 
         case .addPhase:
+            // Open the phase form
             onPhasePrompt()
+
+        case .swipeToQuality:
+            // Touches pass through - grid handles swipe
+            break
 
         case .markWeek:
             // Touches pass through - grid handles long-press

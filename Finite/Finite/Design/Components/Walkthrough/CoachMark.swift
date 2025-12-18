@@ -70,14 +70,13 @@ struct CoachMark: View {
         let safeBottom: CGFloat = 120
 
         switch step {
-        case .gridIntro, .explainChapters, .addPhase, .complete:
-            // Center of screen
+        case .addPhase, .complete:
+            // Center of screen (no grid spotlight)
             return CGPoint(x: screenSize.width / 2, y: screenSize.height / 2)
 
-        case .currentWeekIntro, .swipeToQuality, .markWeek:
-            // Position below the grid (safer - grid starts near top)
+        case .gridIntro, .currentWeekIntro, .swipeToChapters, .explainChapters, .swipeToQuality, .markWeek:
+            // Position below the grid
             let belowGrid = gridFrame.maxY + 80
-            // Make sure it's on screen
             let safeY = min(belowGrid, screenSize.height - safeBottom)
             return CGPoint(x: screenSize.width / 2, y: safeY)
         }
