@@ -69,6 +69,12 @@ struct GridView: View {
     // Magnification loupe state (Quality view long-press)
     @StateObject private var loupeState = LoupeState()
 
+    // Walkthrough state
+    @StateObject private var walkthrough = WalkthroughService.shared
+    @State private var gridFrameForWalkthrough: CGRect = .zero
+    @State private var currentWeekFrameForWalkthrough: CGRect = .zero
+    @State private var dotIndicatorFrameForWalkthrough: CGRect = .zero
+
     private let weeksPerRow: Int = 52
     private let revealDuration: Double = 2.0
     // CRAFT_SPEC: Screen margins 24pt
@@ -258,6 +264,18 @@ struct GridView: View {
                         // Dot indicator pinned to bottom
                         DotIndicator(currentMode: currentViewMode)
                             .padding(.bottom, dotsBottomPadding)
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear.preference(
+                                        key: DotIndicatorFrameKey.self,
+                                        value: geo.frame(in: .global)
+                                    )
+                                }
+                            )
+                            .onPreferenceChange(DotIndicatorFrameKey.self) { frame in
+                                dotIndicatorFrameForWalkthrough = frame
+                                walkthrough.dotIndicatorFrame = frame
+                            }
                     }
                     .frame(height: footerZoneHeight)
                     .frame(maxWidth: .infinity)
@@ -270,6 +288,18 @@ struct GridView: View {
                 BreathingAura(phaseColor: currentAuraColor)
                     .ignoresSafeArea()
                     .transition(.opacity)
+            }
+
+            // Walkthrough overlay (interactive guided tutorial)
+            if walkthrough.isActive {
+                WalkthroughOverlay(
+                    walkthrough: walkthrough,
+                    onPhasePrompt: {
+                        showPhaseBuilder = true
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(1000)
             }
         }
         .background(Color.bgPrimary)
@@ -330,6 +360,9 @@ struct GridView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     if ratedWeeksCache[weekNumberToCheck] != nil {
                         triggerBloomAnimation(for: weekNumberToCheck)
+
+                        // Notify walkthrough that a week was marked
+                        walkthrough.handleWeekMarked()
                     }
                 }
             }
@@ -339,6 +372,17 @@ struct GridView: View {
         }
         .sheet(isPresented: $showPhaseBuilder) {
             PhaseFlowCoordinator(user: user, isPresented: $showPhaseBuilder)
+                .onDisappear {
+                    // Check if walkthrough is waiting for phase action
+                    if walkthrough.currentStep == .addPhase {
+                        // Check if phase was added
+                        if !phases.isEmpty {
+                            walkthrough.handlePhaseAdded()
+                        } else {
+                            walkthrough.handlePhaseSkipped()
+                        }
+                    }
+                }
         }
         .overlay {
             if showPhasePrompt {
@@ -409,6 +453,18 @@ struct GridView: View {
 
             }
             .frame(width: gridWidth, height: gridHeight)
+            .background(
+                GeometryReader { geo in
+                    Color.clear.preference(
+                        key: GridFrameKey.self,
+                        value: geo.frame(in: .global)
+                    )
+                }
+            )
+            .onPreferenceChange(GridFrameKey.self) { frame in
+                gridFrameForWalkthrough = frame
+                walkthrough.gridFrame = frame
+            }
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 50)
@@ -635,6 +691,24 @@ struct GridView: View {
                 .stroke(Color.weekCurrent.opacity(ringOpacity), lineWidth: 2)
                 .frame(width: cellSize * ringScale, height: cellSize * ringScale)
                 .position(x: x, y: y)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear
+                            .preference(
+                                key: CurrentWeekFrameKey.self,
+                                value: CGRect(
+                                    x: geo.frame(in: .global).midX - cellSize / 2,
+                                    y: geo.frame(in: .global).midY - cellSize / 2,
+                                    width: cellSize,
+                                    height: cellSize
+                                )
+                            )
+                    }
+                )
+        }
+        .onPreferenceChange(CurrentWeekFrameKey.self) { frame in
+            currentWeekFrameForWalkthrough = frame
+            walkthrough.currentWeekFrame = frame
         }
         .allowsHitTesting(false)
     }
@@ -653,6 +727,11 @@ struct GridView: View {
             .contentShape(Rectangle())
             .onTapGesture {
                 HapticService.shared.light()
+
+                // Notify walkthrough of current week tap
+                walkthrough.handleCurrentWeekTapped()
+
+                // Open week detail
                 selectedWeekForDetail = WeekIdentifier(value: currentWeekNumber)
             }
             .offset(x: x - (tapSize - cellSize) / 2, y: y - (tapSize - cellSize) / 2)
@@ -838,18 +917,23 @@ struct GridView: View {
             HapticService.shared.heavy()
             AudioService.shared.playTap()
 
-            // CRAFT_SPEC: Phase prompt 1s after Reveal completes
-            // Only show if user hasn't seen it and has no phases
-            if !user.hasSeenPhasePrompt && phases.isEmpty {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    withAnimation(.smooth(duration: 0.3)) {
-                        showPhasePrompt = true
+            // Start walkthrough if needed (replaces old phase prompt and swipe hint)
+            if walkthrough.shouldShow {
+                walkthrough.startIfNeeded()
+            } else {
+                // CRAFT_SPEC: Phase prompt 1s after Reveal completes
+                // Only show if user hasn't seen it and has no phases
+                if !user.hasSeenPhasePrompt && phases.isEmpty {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        withAnimation(.smooth(duration: 0.3)) {
+                            showPhasePrompt = true
+                        }
                     }
                 }
-            }
 
-            // CRAFT_SPEC: First-time swipe hint appears once, fades after 3s
-            showSwipeHintIfNeeded()
+                // CRAFT_SPEC: First-time swipe hint appears once, fades after 3s
+                showSwipeHintIfNeeded()
+            }
         }
     }
 
@@ -988,6 +1072,9 @@ struct GridView: View {
         rebuildGridColorsCache()
         flashModeLabel()
         dismissSwipeHint() // Dismiss hint on first swipe
+
+        // Notify walkthrough of view mode change
+        walkthrough.handleViewModeChanged(to: currentViewMode)
     }
 
     private func swipeToPreviousMode() {
@@ -997,6 +1084,9 @@ struct GridView: View {
         rebuildGridColorsCache()
         flashModeLabel()
         dismissSwipeHint() // Dismiss hint on first swipe
+
+        // Notify walkthrough of view mode change
+        walkthrough.handleViewModeChanged(to: currentViewMode)
     }
 
     // CRAFT_SPEC: Mode label flash - fade in 0.1s, hold 0.5s, fade out 0.2s (total 0.8s)
