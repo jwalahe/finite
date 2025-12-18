@@ -1,7 +1,7 @@
 # Finite — Craft Specification
 
 > Supplement to PRD.md — Technical parameters for premium execution  
-> **Version:** 1.1.0  
+> **Version:** 1.2.0
 > **Last Updated:** December 17, 2024
 
 ---
@@ -58,6 +58,11 @@ This document translates design intent into precise technical specifications. Us
 | Breathing Aura shift | 0.5s | 0 | `.easeInOut` | Phase color transition |
 | Spine label appear | 0.15s | 0.1 | `.snappy` | Scale + fade in |
 | Spine label dismiss | 0.2s | 0 | `.easeOut` | Fade out |
+| Phase highlight dim | 0.25s | 0.1 | `.snappy` | Dim non-phase weeks |
+| Phase highlight undim | 0.2s | 0 | `.easeOut` | Restore full opacity |
+| Loupe appear | 0.15s | 0.1 | `.snappy` | Scale + fade in |
+| Loupe dismiss | 0.1s | 0 | `.easeOut` | Scale + fade out |
+| Header crossfade | 0.2s | 0 | `.easeOut` | Mode-specific header |
 | Spectrum slider thumb | 0.1s | 0.2 | `.snappy` | Snap to notch |
 | Modal present | 0.3s | 0.1 | `.smooth` | Slide up from bottom |
 | Year wheel scroll | — | 0.15 | `.smooth` | Native picker feel |
@@ -88,6 +93,15 @@ This document translates design intent into precise technical specifications. Us
 // Mode label flash
 .opacity(showModeLabel ? 1.0 : 0.0)
 .animation(.easeOut(duration: 0.8), value: showModeLabel)
+
+// Phase highlight dim
+.overlay(dimOverlay)
+.animation(.snappy(duration: 0.25, extraBounce: 0.1), value: highlightedPhase)
+
+// Loupe appear
+.scaleEffect(loupeState.isActive ? 1.0 : 0.8)
+.opacity(loupeState.isActive ? 1.0 : 0.0)
+.animation(.snappy(duration: 0.15, extraBounce: 0.1), value: loupeState.isActive)
 ```
 
 ### The Reveal Animation (Signature Moment)
@@ -141,6 +155,11 @@ T+31.5s:    Phase prompt modal slides up
 | Year wheel tick | Selection | — | On year change |
 | Phase add confirm | Impact | `.medium` | On "Add Chapter" |
 | Time Spine tap | Impact | `.light` | On phase tap |
+| Phase highlight (spine) | Impact | `.light` | On spine tap |
+| Loupe activate | Impact | `.light` | At 300ms threshold |
+| Loupe week hover | Selection | — | On week change while dragging |
+| Loupe release | Impact | `.medium` | On week selection |
+| Direct week tap | Impact | `.light` | On Quality mode tap |
 | Ghost number summon | Impact | `.light` | On tap to reveal |
 | Error | Notification | `.error` | On validation fail |
 
@@ -311,6 +330,31 @@ Auto-assignment order: Colors assigned in sequence as phases are created. User c
 
 ## 7. Component Specifications
 
+### Header Per View Mode
+
+```
+┌─────────────────────────────────────┐
+│                                     │
+│           finite                    │  ← App title (always visible)
+│           College                   │  ← Subtitle (varies by mode)
+│                                     │
+└─────────────────────────────────────┘
+
+View-specific subtitles:
+- Chapters: Current phase name (e.g., "College", "Career")
+           If no current phase: "Chapters" in tertiary color
+- Quality: "2,647 weeks remaining" countdown
+- Focus: Empty (no subtitle shown)
+
+Title styling:
+- App name: body, text-primary
+- Subtitle: caption, text-secondary (or text-tertiary if no phase)
+
+Behavior:
+- Crossfade between subtitles when mode changes (0.2s)
+- Subtitle updates in real-time as user scrolls through phases
+```
+
 ### Week Cell
 
 ```
@@ -410,6 +454,52 @@ Behavior:
 - Should feel ambient, not attention-grabbing
 ```
 
+### Magnification Loupe (Quality View Only)
+
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│         ┌─────────────┐                 │  ← Loupe floats above finger
+│         │  ●  ●  ●    │                 │
+│         │  ●  ◎  ●    │  80pt radius    │  ◎ = highlighted week
+│         │  ●  ●  ●    │  1.5x magnified │
+│         └─────────────┘                 │
+│                                         │
+│              [Grid]                     │
+│                👆                        │  ← User's finger (long press)
+│                                         │
+└─────────────────────────────────────────┘
+
+Technical specifications:
+- Loupe radius: 80pt
+- Magnification: 1.5x
+- Border: 2pt, bg-secondary color
+- Shadow: black 20% opacity, 12pt blur, 4pt y-offset
+- Position: Centered above touch point, 20pt gap from finger
+
+Activation:
+- Trigger: Long press 300ms on grid
+- Appear animation: 0.15s snappy with slight bounce
+- Haptic: .light on activation
+
+During drag:
+- Loupe follows finger position
+- Magnified view updates in real-time
+- Highlighted week shown with weekCurrent color ring (2pt stroke)
+- Haptic: selection feedback on each week change
+
+Release:
+- If over valid week: Opens week detail sheet
+- Haptic: .medium on selection
+- Dismiss animation: 0.1s ease-out
+
+Rendering:
+- Use Canvas for performance
+- Clip to circular shape
+- Draw magnified versions of nearby week cells
+- Only show weeks within loupe bounds
+```
+
 ### Ghost Number (Focus View Only)
 
 ```
@@ -463,12 +553,74 @@ func summonNumber() {
 ```
 ```
 
+### Phase Highlight (Chapters View Only)
+
+```
+Normal state:                       Highlighted state (spine tapped):
+┌──┬──────────────────────┐        ┌──┬──────────────────────┐
+│██│ ● ● ● ● ● ● ● ● ● ● │        │██│ ░ ░ ░ ░ ░ ░ ░ ░ ░ ░ │  ← Dimmed (30%)
+│██│ ● ● ● ● ● ● ● ● ● ● │        │██│ ░ ░ ░ ░ ░ ░ ░ ░ ░ ░ │
+│▓▓│ ● ● ● ● ● ● ● ● ● ● │ ← tap  │▓▓│ ● ● ● ● ● ● ● ● ● ● │  ← Full opacity
+│▓▓│ ● ● ● ● ● ● ● ● ● ● │        │▓▓│ ● ● ● ● ● ● ● ● ● ● │
+│░░│ ● ● ● ● ● ● ● ● ● ● │        │░░│ ░ ░ ░ ░ ░ ░ ░ ░ ░ ░ │  ← Dimmed (30%)
+└──┴──────────────────────┘        └──┴──────────────────────┘
+
+Interaction:
+1. User taps a phase segment on Time Spine
+2. All weeks OUTSIDE that phase dim to 30% opacity
+3. Weeks INSIDE the tapped phase remain at full opacity
+4. Floating label appears showing phase name and date range
+5. Auto-dismiss after 3 seconds, or on grid tap
+
+Implementation:
+- Overlay Canvas draws bg-primary at 70% opacity on non-phase weeks
+- Animation: 0.25s snappy on highlight, 0.2s ease-out on dismiss
+- Haptic: .light on spine tap
+
+Use case:
+- Helps user focus on a specific life chapter
+- Visual isolation without navigation
+- Encourages reflection on bounded time periods
+```
+
+### Phase Context Bar (Chapters Footer)
+
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│              [Grid]                     │
+│                                         │
+│  ━━━━━━━━━━━━━━━━●━━━━━━━━━━━━━━━━━    │  ← Progress bar (phase color)
+│           3 years in Career             │  ← Context label
+│                                         │
+│              ○ ● ○                      │  ← Dot indicator
+└─────────────────────────────────────────┘
+
+Progress bar:
+- Track: bg-tertiary, 6pt height, 3pt corner radius
+- Fill: Current phase color, proportional to progress within phase
+- Animation: 0.2s ease-out on progress change
+
+Context label:
+- Font: 12pt medium
+- Color: text-secondary
+- Format options:
+  - "X years in [Phase]" — if phase is ongoing
+  - "Year X of Y" — if phase has defined end
+  - "No chapter defined" — if current week has no phase
+
+Position:
+- Below grid, above dot indicator
+- Horizontal padding: 24pt (screen margins)
+- Replaces generic "X lived / Y remaining" footer for Chapters view
+```
+
 ### Footer by View Mode (Summary)
 
 | View | Left Edge | Footer Center | Behavior |
 |------|-----------|---------------|----------|
-| Chapters | Time Spine (12pt) | Dot indicator | Breathing Aura on edges |
-| Quality | None | "Edit this week" + Dot indicator | Standard action footer |
+| Chapters | Time Spine (12pt) | Phase Context Bar + Dot indicator | Breathing Aura on edges |
+| Quality | None | Dot indicator | Direct tap or long-press loupe for selection |
 | Focus | None | Ghost number + Dot indicator | Tap to summon number |
 
 ### View Mode Label (Flash)
@@ -491,16 +643,44 @@ Animation: Fade in 0.1s, hold 0.5s, fade out 0.2s
 
 ```
 Gesture: Horizontal swipe on grid area
-Direction: 
+Direction:
   - Swipe left: Next mode (Chapters → Quality → Focus → Chapters)
   - Swipe right: Previous mode (Focus → Quality → Chapters → Focus)
 Threshold: 50pt horizontal movement
 Animation: Grid crossfades between color schemes (0.2s)
-Feedback: 
+Feedback:
   - Mode label flashes
   - Dot indicator updates
   - Light haptic on change
 First-time hint: "← Swipe to change view →" appears once, fades after 3s
+```
+
+### Week Selection by View Mode
+
+**Philosophy:** Intentionality over convenience. Each view mode has a purpose-built selection model that reinforces its character.
+
+```
+┌────────────┬─────────────────────┬──────────────────────────────────┐
+│ View Mode  │ Selection Method    │ Behavior                         │
+├────────────┼─────────────────────┼──────────────────────────────────┤
+│ Chapters   │ Spine → Week        │ Tap spine to highlight phase,    │
+│            │                     │ then tap week within phase       │
+│            │                     │ → Opens week detail sheet        │
+├────────────┼─────────────────────┼──────────────────────────────────┤
+│ Quality    │ Direct tap OR       │ Single tap: Opens week detail    │
+│            │ Long-press loupe    │ Long-press: Magnification loupe  │
+│            │                     │ for precise selection            │
+├────────────┼─────────────────────┼──────────────────────────────────┤
+│ Focus      │ Disabled            │ No selection allowed.            │
+│            │                     │ Focus mode is for viewing only.  │
+└────────────┴─────────────────────┴──────────────────────────────────┘
+
+Design rationale:
+- NO global navigation slider — forces engagement with the grid itself
+- Chapters requires two-step selection — reinforces chapter context
+- Quality has direct access — this is the active reflection mode
+- Focus blocks selection — this view is for contemplation, not action
+- Long-press loupe for precision — small cells demand intentional gesture
 ```
 
 ### Spectrum Slider
@@ -837,11 +1017,29 @@ Before any PR, verify:
 - [ ] Spine label appears on tap, dismisses after 2s
 - [ ] Breathing Aura visible only in Chapters view
 - [ ] Aura color shifts when scrolling through phases
-- [ ] "Edit this week" button visible only in Quality view
+- [ ] Phase Context Bar visible only in Chapters view
+- [ ] Context bar shows progress within current phase
 - [ ] Ghost number visible only in Focus view
 - [ ] Ghost number at 8% opacity by default
 - [ ] Tap summons ghost number to 100%, fades back
 - [ ] Light haptic on ghost number summon
+
+### Week Selection
+- [ ] No global navigation slider exists
+- [ ] Header shows view-mode-specific subtitle
+- [ ] Chapters: Current phase name or "Chapters" fallback
+- [ ] Quality: Weeks remaining countdown
+- [ ] Focus: No subtitle
+- [ ] Chapters mode: Spine tap highlights phase, dims others
+- [ ] Chapters mode: Phase highlight auto-dismisses after 3s
+- [ ] Quality mode: Direct tap opens week detail
+- [ ] Quality mode: Long-press activates magnification loupe
+- [ ] Loupe appears after 300ms hold
+- [ ] Loupe radius is 80pt, magnification is 1.5x
+- [ ] Loupe tracks finger position smoothly
+- [ ] Selection haptic on week change while dragging
+- [ ] Medium haptic on week selection release
+- [ ] Focus mode: No week selection allowed
 
 ---
 

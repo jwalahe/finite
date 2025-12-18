@@ -267,6 +267,36 @@ Acceptance Criteria:
 - Dot indicator updates (● ○ ○ → ○ ● ○)
 - Haptic feedback on mode change
 - Preference persisted locally
+
+HEADER PER VIEW MODE:
+- Chapters: Shows current phase name (or "Chapters" if not in a phase)
+- Quality: Shows "X weeks remaining" countdown
+- Focus: No subtitle (header area minimal, ghost number is the focus)
+```
+
+#### Week Selection
+```
+US-012: As a user, I want intentional week selection that matches each view's purpose.
+
+Acceptance Criteria:
+
+CHAPTERS VIEW:
+- Tap Time Spine segment → highlights corresponding phase on grid
+- Grid weeks outside selected phase dim to 30% opacity
+- Tap any week within highlighted phase → opens week detail sheet
+- Tap elsewhere or wait 3s → highlight dismisses
+
+QUALITY VIEW:
+- Tap week directly → opens week detail sheet
+- Long-press (300ms) on grid → magnification loupe appears (1.5x, 80pt radius)
+- Nearest week to finger highlights
+- Lift finger → opens week detail sheet for highlighted week
+- Haptic: .light on highlight, .medium on selection confirm
+
+FOCUS VIEW:
+- No week selection
+- Tapping weeks does nothing (pure contemplation mode)
+- Only interaction: tap to summon ghost number
 ```
 
 #### Widget

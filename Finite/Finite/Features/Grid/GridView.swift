@@ -38,11 +38,8 @@ struct GridView: View {
     // Index = weekNumber - 1, stores resolved Color for each week
     @State private var gridColorsCache: [Color] = []
 
-    // Scrubber state - isolated to prevent cascade
-    @State private var isScrubbing: Bool = false
-
     // View mode state (Chapters/Quality/Focus)
-    @State private var currentViewMode: ViewMode = .quality
+    @State private var currentViewMode: ViewMode = .focus
 
     // Week confirm bloom animation
     @State private var bloomWeekNumber: Int?
@@ -65,11 +62,12 @@ struct GridView: View {
     // Breathing Aura - current phase color based on scroll position
     @State private var currentAuraColor: Color = .clear
 
-    // Spine phase label state (rendered as overlay to appear above grid)
-    @State private var spineLabelPhase: LifePhase?
-    @State private var spineLabelY: CGFloat = 0
-    @State private var showSpineLabel: Bool = false
-    @State private var spineLabelDismissTask: Task<Void, Never>?
+    // Phase highlight state - dims non-phase weeks and summons GhostPhase
+    @State private var highlightedPhase: LifePhase?
+    @State private var phaseHighlightDismissTask: Task<Void, Never>?
+
+    // Magnification loupe state (Quality view long-press)
+    @StateObject private var loupeState = LoupeState()
 
     private let weeksPerRow: Int = 52
     private let revealDuration: Double = 2.0
@@ -196,12 +194,18 @@ struct GridView: View {
             let rowHeight = cellSize + spacing
             let gridHeight = CGFloat(user.lifeExpectancy) * rowHeight - spacing
 
-            VStack(spacing: 0) {
-                // Scrollable content
+            // Dynamic footer sizing based on screen height
+            // Larger screens get more footer space, smaller screens get minimum
+            let screenHeight = geometry.size.height
+            let footerZoneHeight = max(screenHeight * 0.18, 140)  // 18% of screen or min 140pt
+            let dotsBottomPadding: CGFloat = 32
+
+            ZStack(alignment: .bottom) {
+                // Scrollable content (header + grid)
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 0) {
                         headerView
-                            .padding(.bottom, 24)
+                            .padding(.bottom, 12)
 
                         // Grid with age labels
                         gridWithLabels(
@@ -210,72 +214,54 @@ struct GridView: View {
                             gridWidth: gridWidth,
                             gridHeight: gridHeight
                         )
-
-                        // View mode specific content
-                        if hasRevealCompleted && !isScrubbing {
-                            viewModeFooterContent
-                                .padding(.top, 24)
-                                .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                        }
-
-                        footerView
-                            .padding(.top, 32)
-                            .padding(.bottom, 24)
-                    }
-                    .padding(.top, 24)
-                }
-
-                // Mode label flash + Dot indicator
-                if hasRevealCompleted {
-                    VStack(spacing: 8) {
-                        // First-time swipe hint (shown once)
-                        if showSwipeHint {
-                            Text("← Swipe to change view →")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(Color.textSecondary)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(Color.bgSecondary.opacity(0.9))
-                                .cornerRadius(8)
-                                .transition(.opacity)
-                        }
-
-                        // Mode label (flashes on change)
-                        if showModeLabel {
-                            Text(currentViewMode.displayName)
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(Color.textPrimary)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.bgPrimary.opacity(0.8))
-                                .cornerRadius(6)
-                                .transition(.opacity)
-                        }
-
-                        DotIndicator(currentMode: currentViewMode)
                     }
                     .padding(.top, 12)
-                    .transition(.opacity)
+                    .padding(.bottom, footerZoneHeight)  // Prevent grid hiding behind footer
                 }
 
-                // Timeline Scrubber - Fixed at bottom, outside ScrollView
-                // OPTIMIZATION: Isolated view to prevent state changes from invalidating grid
+                // Fixed footer overlay at bottom of screen
                 if hasRevealCompleted {
-                    TimelineScrubber(
-                        weeksLived: weeksLived,
-                        totalWeeks: totalWeeks,
-                        currentWeekNumber: currentWeekNumber,
-                        lifeExpectancy: user.lifeExpectancy,
-                        ratedWeeks: ratedWeeksCache,
-                        screenWidth: geometry.size.width,
-                        onWeekSelected: { weekNum in
-                            selectedWeekForDetail = WeekIdentifier(value: weekNum)
-                        },
-                        onScrubbingChanged: { scrubbing in
-                            isScrubbing = scrubbing
+                    VStack(spacing: 0) {
+                        Spacer()
+
+                        // View mode specific content (centered in zone above dots)
+                        VStack(spacing: 8) {
+                            viewModeFooterContent
+
+                            // First-time swipe hint (shown once)
+                            if showSwipeHint {
+                                Text("← Swipe to change view →")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Color.textSecondary)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 6)
+                                    .background(Color.bgSecondary.opacity(0.9))
+                                    .cornerRadius(8)
+                                    .transition(.opacity)
+                            }
+
+                            // Mode label (flashes on change)
+                            if showModeLabel {
+                                Text(currentViewMode.displayName)
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(Color.textPrimary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 4)
+                                    .background(Color.bgPrimary.opacity(0.8))
+                                    .cornerRadius(6)
+                                    .transition(.opacity)
+                            }
                         }
-                    )
-                    .padding(.bottom, geometry.safeAreaInsets.bottom > 0 ? 0 : 16)
+
+                        Spacer()
+
+                        // Dot indicator pinned to bottom
+                        DotIndicator(currentMode: currentViewMode)
+                            .padding(.bottom, dotsBottomPadding)
+                    }
+                    .frame(height: footerZoneHeight)
+                    .frame(maxWidth: .infinity)
+                    .transition(.opacity)
                 }
             }
 
@@ -284,18 +270,6 @@ struct GridView: View {
                 BreathingAura(phaseColor: currentAuraColor)
                     .ignoresSafeArea()
                     .transition(.opacity)
-            }
-
-            // Spine phase label overlay (renders above grid)
-            if showSpineLabel, let phase = spineLabelPhase {
-                SpinePhaseLabel(
-                    phase: phase,
-                    yPosition: spineLabelY,
-                    gridHeight: CGFloat(user.lifeExpectancy) * 10 // Approximate row height
-                )
-                .padding(.top, 100) // Offset for header
-                .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .leading)))
-                .zIndex(100)
             }
         }
         .background(Color.bgPrimary)
@@ -316,7 +290,12 @@ struct GridView: View {
             updateAuraColor()
         }
         .onChange(of: weeks.count) { _, _ in
-            // Rebuild cache when weeks change (new week marked)
+            // Rebuild cache when weeks added/deleted
+            rebuildRatedWeeksCache()
+            rebuildGridColorsCache()
+        }
+        .onChange(of: weeks.map { "\($0.weekNumber)-\($0.rating ?? 0)" }) { _, _ in
+            // Rebuild cache when any week's rating is updated
             rebuildRatedWeeksCache()
             rebuildGridColorsCache()
         }
@@ -512,10 +491,86 @@ struct GridView: View {
                 bloomRingOverlay(weekNumber: bloomWeek, cellSize: cellSize, spacing: spacing)
             }
 
-            // Tap gesture for current week quick access
-            currentWeekTapTarget(cellSize: cellSize, spacing: spacing)
+            // Phase highlight dim overlay (when spine segment is tapped)
+            if let phase = highlightedPhase {
+                phaseHighlightDimOverlay(
+                    phase: phase,
+                    cellSize: cellSize,
+                    spacing: spacing,
+                    gridWidth: gridWidth,
+                    gridHeight: gridHeight
+                )
+            }
+
+            // Tap gesture for current week quick access (Quality mode)
+            // Also tap to select week within highlighted phase (Chapters mode)
+            if currentViewMode == .quality || highlightedPhase != nil {
+                weekTapTarget(cellSize: cellSize, spacing: spacing)
+            } else if currentViewMode == .chapters && highlightedPhase == nil {
+                // Only current week tap in Chapters when no phase highlighted
+                currentWeekTapTarget(cellSize: cellSize, spacing: spacing)
+            }
+
+            // Magnification loupe overlay (Quality view long-press)
+            if loupeState.isActive && currentViewMode == .quality {
+                // Dim the grid behind the loupe for clarity
+                Color.bgPrimary.opacity(0.6)
+                    .frame(width: gridWidth, height: gridHeight)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+                    .zIndex(199)
+
+                MagnificationLoupe(
+                    position: loupeState.position,
+                    highlightedWeek: loupeState.highlightedWeek,
+                    cellSize: cellSize,
+                    spacing: spacing,
+                    gridColors: gridColorsCache,
+                    weeksPerRow: weeksPerRow,
+                    totalWeeks: totalWeeks
+                )
+                .transition(.scale.combined(with: .opacity))
+                .zIndex(200)
+            }
         }
         .frame(width: gridWidth, height: gridHeight)
+    }
+
+    // MARK: - Phase Highlight Dim Overlay
+    // Dims weeks outside the highlighted phase to 30% opacity
+
+    private func phaseHighlightDimOverlay(
+        phase: LifePhase,
+        cellSize: CGFloat,
+        spacing: CGFloat,
+        gridWidth: CGFloat,
+        gridHeight: CGFloat
+    ) -> some View {
+        let birthYear = user.birthYear
+        let startWeek = phase.startWeek(birthYear: birthYear)
+        let endWeek = min(phase.endWeek(birthYear: birthYear), currentWeekNumber)
+
+        return Canvas { context, _ in
+            // Draw semi-transparent overlay on weeks OUTSIDE the phase
+            for weekNumber in 1...totalWeeks {
+                let isInPhase = weekNumber >= startWeek && weekNumber <= endWeek
+
+                if !isInPhase {
+                    let row = (weekNumber - 1) / weeksPerRow
+                    let col = (weekNumber - 1) % weeksPerRow
+                    let x = CGFloat(col) * (cellSize + spacing)
+                    let y = CGFloat(row) * (cellSize + spacing)
+                    let rect = CGRect(x: x, y: y, width: cellSize, height: cellSize)
+                    let circle = Path(ellipseIn: rect)
+
+                    // Dim with background color at 70% opacity (makes dots appear at 30%)
+                    context.fill(circle, with: .color(Color.bgPrimary.opacity(0.7)))
+                }
+            }
+        }
+        .frame(width: gridWidth, height: gridHeight)
+        .allowsHitTesting(false)
+        .transition(.opacity)
     }
 
     // MARK: - Bloom Ring Overlay (Week Confirm Animation)
@@ -570,27 +625,16 @@ struct GridView: View {
         let x = CGFloat(col) * (cellSize + spacing) + cellSize / 2
         let y = CGFloat(row) * (cellSize + spacing) + cellSize / 2
 
-        return Group {
-            if isScrubbing {
-                // Static ring during scrub - no TimelineView overhead
-                Circle()
-                    .stroke(Color.weekCurrent.opacity(0.4), lineWidth: 2)
-                    .frame(width: cellSize * 2.0, height: cellSize * 2.0)
-                    .position(x: x, y: y)
-            } else {
-                // Animated pulse when not scrubbing
-                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-                    let elapsed = timeline.date.timeIntervalSinceReferenceDate
-                    let phase = (sin(elapsed * .pi * 0.8) + 1) / 2
-                    let ringScale = 1.8 + (0.6 * phase)
-                    let ringOpacity = 0.6 - (0.4 * phase)
+        return TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+            let elapsed = timeline.date.timeIntervalSinceReferenceDate
+            let phase = (sin(elapsed * .pi * 0.8) + 1) / 2
+            let ringScale = 1.8 + (0.6 * phase)
+            let ringOpacity = 0.6 - (0.4 * phase)
 
-                    Circle()
-                        .stroke(Color.weekCurrent.opacity(ringOpacity), lineWidth: 2)
-                        .frame(width: cellSize * ringScale, height: cellSize * ringScale)
-                        .position(x: x, y: y)
-                }
-            }
+            Circle()
+                .stroke(Color.weekCurrent.opacity(ringOpacity), lineWidth: 2)
+                .frame(width: cellSize * ringScale, height: cellSize * ringScale)
+                .position(x: x, y: y)
         }
         .allowsHitTesting(false)
     }
@@ -614,28 +658,131 @@ struct GridView: View {
             .offset(x: x - (tapSize - cellSize) / 2, y: y - (tapSize - cellSize) / 2)
     }
 
+    // MARK: - Week Tap Target (Full Grid)
+    // For Quality mode: direct tap on any lived week, long-press for loupe
+    // For Chapters mode with highlighted phase: tap to select week within phase
+
+    private func weekTapTarget(cellSize: CGFloat, spacing: CGFloat) -> some View {
+        GeometryReader { _ in
+            Color.clear
+                .contentShape(Rectangle())
+                .gesture(
+                    currentViewMode == .quality
+                        ? qualityModeGesture(cellSize: cellSize, spacing: spacing)
+                        : nil
+                )
+                .simultaneousGesture(
+                    TapGesture()
+                        .onEnded { _ in
+                            // This won't work for location - need to use the drag gesture for positioning
+                        }
+                )
+                .onTapGesture { location in
+                    if !loupeState.isActive {
+                        handleWeekTap(at: location, cellSize: cellSize, spacing: spacing)
+                    }
+                }
+        }
+    }
+
+    // Quality mode gesture: long-press activates loupe, drag moves it
+    private func qualityModeGesture(cellSize: CGFloat, spacing: CGFloat) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.3)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .onChanged { value in
+                switch value {
+                case .first(true):
+                    // Long press recognized but drag hasn't started
+                    break
+                case .second(true, let drag):
+                    if let dragValue = drag {
+                        if !loupeState.isActive {
+                            // Activate loupe
+                            withAnimation(.snappy(duration: 0.15, extraBounce: 0.1)) {
+                                loupeState.isActive = true
+                                loupeState.position = dragValue.location
+                            }
+                            HapticService.shared.light()
+                        }
+                        // Update loupe position
+                        loupeState.updatePosition(
+                            dragValue.location,
+                            cellSize: cellSize,
+                            spacing: spacing,
+                            weeksPerRow: weeksPerRow,
+                            weeksLived: weeksLived
+                        )
+                    }
+                default:
+                    break
+                }
+            }
+            .onEnded { value in
+                if case .second(true, _) = value {
+                    // End loupe and select week
+                    if let selectedWeek = loupeState.endLongPress() {
+                        selectedWeekForDetail = WeekIdentifier(value: selectedWeek)
+                    }
+                }
+            }
+    }
+
+    private func handleWeekTap(at location: CGPoint, cellSize: CGFloat, spacing: CGFloat) {
+        // Calculate which week was tapped
+        let col = Int(location.x / (cellSize + spacing))
+        let row = Int(location.y / (cellSize + spacing))
+        let weekNumber = row * weeksPerRow + col + 1
+
+        // Validate week is within lived weeks
+        guard weekNumber >= 1 && weekNumber <= weeksLived else {
+            // Tapped on future week - dismiss phase highlight if active
+            if highlightedPhase != nil {
+                dismissPhaseHighlight()
+            }
+            return
+        }
+
+        // In Chapters mode with highlighted phase, only allow taps within the phase
+        if currentViewMode == .chapters, let phase = highlightedPhase {
+            let birthYear = user.birthYear
+            let startWeek = phase.startWeek(birthYear: birthYear)
+            let endWeek = min(phase.endWeek(birthYear: birthYear), currentWeekNumber)
+
+            if weekNumber >= startWeek && weekNumber <= endWeek {
+                // Tap within highlighted phase - open week detail
+                HapticService.shared.medium()
+                dismissPhaseHighlight()
+                selectedWeekForDetail = WeekIdentifier(value: weekNumber)
+            } else {
+                // Tap outside phase - dismiss highlight
+                dismissPhaseHighlight()
+            }
+        } else if currentViewMode == .quality {
+            // Quality mode: direct tap opens week detail
+            HapticService.shared.light()
+            selectedWeekForDetail = WeekIdentifier(value: weekNumber)
+        }
+    }
+
     // MARK: - View Mode Footer Content
-    // CRAFT_SPEC: Chapters - no button, Quality - Edit button, Focus - Ghost number
+    // Each view has a "ghost" element at 8% opacity that summons on interaction
+    // Philosophy: Information appears only when sought, then gracefully recedes
 
     @ViewBuilder
     private var viewModeFooterContent: some View {
-        Group {
-            switch currentViewMode {
-            case .chapters:
-                // No button in Chapters view - spine is the interaction
-                // Use invisible spacer to maintain layout
-                Color.clear.frame(height: 44)
+        switch currentViewMode {
+        case .focus:
+            // Ghost number - tap to summon
+            GhostNumber(weeksRemaining: user.weeksRemaining)
 
-            case .quality:
-                // "Edit This Week" button only in Quality view
-                markCurrentWeekButton
+        case .chapters:
+            // Ghost phase - summoned when spine is tapped
+            GhostPhase(user: user, phases: phases, summonedPhase: $highlightedPhase)
 
-            case .focus:
-                // Ghost number in Focus view
-                GhostNumber(weeksRemaining: user.weeksRemaining)
-            }
+        case .quality:
+            // "Edit This Week" button
+            markCurrentWeekButton
         }
-        .animation(.easeOut(duration: 0.2), value: currentViewMode)
     }
 
     // MARK: - Mark Current Week Button
@@ -736,6 +883,26 @@ struct GridView: View {
 
     // MARK: - Header
 
+    // Header subtitle - shows view mode subheader to help identify the current view
+    @ViewBuilder
+    private var headerSubtitle: some View {
+        Text(currentViewMode.subheader)
+            .font(.caption)
+            .foregroundStyle(Color.textSecondary)
+    }
+
+    // Get current phase name based on current week
+    private var currentPhaseName: String? {
+        let birthYear = user.birthYear
+        let current = currentWeekNumber
+
+        return phases.first(where: { phase in
+            let start = phase.startWeek(birthYear: birthYear)
+            let end = phase.endWeek(birthYear: birthYear)
+            return current >= start && current <= end
+        })?.name
+    }
+
     private var headerView: some View {
         HStack {
             // Settings button
@@ -766,13 +933,12 @@ struct GridView: View {
                     .foregroundStyle(Color.textPrimary)
 
                 if hasRevealCompleted {
-                    Text("\(user.weeksRemaining.formatted()) weeks remaining")
-                        .font(.caption)
-                        .foregroundStyle(Color.textSecondary)
+                    headerSubtitle
                         .transition(.opacity)
                 }
             }
             .animation(.easeIn(duration: 0.5), value: hasRevealCompleted)
+            .animation(.easeOut(duration: 0.2), value: currentViewMode)
 
             Spacer()
 
@@ -845,31 +1011,43 @@ struct GridView: View {
         }
     }
 
-    // MARK: - Spine Label Handling
+    // MARK: - Spine Tap Handling
+    // Spine tap triggers: (1) grid dim overlay, (2) GhostPhase summon at footer
+    // GhostPhase handles its own fade timing, so we just need to manage the grid dim
 
     private func handleSpineTap(phase: LifePhase, yPosition: CGFloat) {
         // Cancel any existing dismiss task
-        spineLabelDismissTask?.cancel()
+        phaseHighlightDismissTask?.cancel()
 
-        spineLabelPhase = phase
-        spineLabelY = yPosition
-
-        withAnimation(.snappy(duration: 0.15, extraBounce: 0.1)) {
-            showSpineLabel = true
+        // Set highlighted phase - this triggers:
+        // 1. Grid dim overlay (via phaseHighlightDimOverlay)
+        // 2. GhostPhase summon (bound to highlightedPhase)
+        withAnimation(.easeOut(duration: 0.2)) {
+            highlightedPhase = phase
         }
 
-        // CRAFT_SPEC: Label dismisses after 2s
-        spineLabelDismissTask = Task {
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+        // Rebuild grid with dimmed colors
+        rebuildGridColorsCache()
+
+        // Grid dim dismisses after 3s or when GhostPhase sets highlightedPhase to nil
+        phaseHighlightDismissTask = Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
 
             guard !Task.isCancelled else { return }
 
             await MainActor.run {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    showSpineLabel = false
-                }
+                dismissPhaseHighlight()
             }
         }
+    }
+
+    private func dismissPhaseHighlight() {
+        guard highlightedPhase != nil else { return }
+
+        withAnimation(.easeOut(duration: 0.2)) {
+            highlightedPhase = nil
+        }
+        rebuildGridColorsCache()
     }
 
     // MARK: - Breathing Aura Color
@@ -944,36 +1122,11 @@ struct GridView: View {
         }
     }
 
-    // MARK: - Footer
-    // Hidden in Focus view (ghost number is the footer)
-
-    private var footerView: some View {
-        Group {
-            if currentViewMode != .focus {
-                HStack(spacing: 32) {
-                    VStack(spacing: 4) {
-                        Text("\(user.weeksLived.formatted())")
-                            .font(.system(size: 28, weight: .light, design: .rounded))
-                            .foregroundStyle(Color.textPrimary)
-                        Text("lived")
-                            .font(.caption2)
-                            .foregroundStyle(Color.textTertiary)
-                    }
-
-                    VStack(spacing: 4) {
-                        Text("\(user.weeksRemaining.formatted())")
-                            .font(.system(size: 28, weight: .light, design: .rounded))
-                            .foregroundStyle(Color.textSecondary)
-                        Text("remaining")
-                            .font(.caption2)
-                            .foregroundStyle(Color.textTertiary)
-                    }
-                }
-            }
-        }
-        .opacity(hasRevealCompleted ? 1 : 0)
-        .animation(.easeIn(duration: 0.5).delay(0.3), value: hasRevealCompleted)
-    }
+    // MARK: - Footer (Removed)
+    // Generic lived/remaining footer removed - each view mode has its own footer:
+    // - Chapters: PhaseContextBar
+    // - Quality: "Edit This Week" button (header shows countdown)
+    // - Focus: Ghost number
 }
 
 // MARK: - Scale Button Style
@@ -983,199 +1136,6 @@ struct ScaleButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
             .animation(.snappy(duration: 0.12), value: configuration.isPressed)
-    }
-}
-
-// MARK: - Isolated Timeline Scrubber
-// This is a separate struct to isolate its state from GridView
-// Scrubber position/highlight changes won't trigger GridView body recomputation
-
-struct TimelineScrubber: View {
-    let weeksLived: Int
-    let totalWeeks: Int
-    let currentWeekNumber: Int
-    let lifeExpectancy: Int
-    let ratedWeeks: [Int: Int]
-    let screenWidth: CGFloat
-    let onWeekSelected: (Int) -> Void
-    let onScrubbingChanged: (Bool) -> Void
-
-    // All scrubber state is LOCAL to this view
-    @State private var scrubberPosition: CGFloat = 0.0
-    @State private var isScrubbing: Bool = false
-    @State private var highlightedWeekNumber: Int?
-    @State private var isInitialized: Bool = false
-
-    private let weeksPerRow: Int = 52
-    private let scrubberPadding: CGFloat = 24
-    private let thumbSize: CGFloat = 28
-    private let trackHeight: CGFloat = 6
-
-    private var scrubberWidth: CGFloat {
-        screenWidth - (scrubberPadding * 2)
-    }
-
-    private var livedPosition: CGFloat {
-        CGFloat(weeksLived) / CGFloat(totalWeeks)
-    }
-
-    var body: some View {
-        VStack(spacing: 12) {
-            // Week info card (shows when scrubbing)
-            if isScrubbing, let weekNum = highlightedWeekNumber {
-                scrubberInfoCard(weekNumber: weekNum)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-            }
-
-            // Scrubber track
-            VStack(spacing: 8) {
-                ZStack(alignment: .leading) {
-                    // Background track
-                    Capsule()
-                        .fill(Color.bgTertiary)
-                        .frame(height: trackHeight)
-
-                    // Filled portion (lived weeks)
-                    Capsule()
-                        .fill(Color.gridFilled)
-                        .frame(width: scrubberWidth * livedPosition, height: trackHeight)
-
-                    // Thumb
-                    Circle()
-                        .fill(Color.bgPrimary)
-                        .frame(width: thumbSize, height: thumbSize)
-                        .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
-                        .overlay(
-                            Circle()
-                                .fill(isScrubbing ? Color.weekCurrent : Color.gridFilled)
-                                .frame(width: thumbSize - 8, height: thumbSize - 8)
-                        )
-                        .offset(x: (scrubberWidth - thumbSize) * scrubberPosition)
-                }
-                .frame(width: scrubberWidth, height: thumbSize)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            if !isScrubbing {
-                                isScrubbing = true
-                                onScrubbingChanged(true)
-                                HapticService.shared.medium()
-                            }
-
-                            // Calculate position (0 to livedPosition only)
-                            let newPosition = max(0, min(livedPosition, value.location.x / scrubberWidth))
-                            scrubberPosition = newPosition
-
-                            // Calculate highlighted week
-                            let weekNum = max(1, min(weeksLived, Int(ceil(newPosition / livedPosition * CGFloat(weeksLived)))))
-                            if weekNum != highlightedWeekNumber {
-                                highlightedWeekNumber = weekNum
-                                HapticService.shared.selection()
-                            }
-                        }
-                        .onEnded { _ in
-                            if let weekNum = highlightedWeekNumber {
-                                HapticService.shared.medium()
-                                onWeekSelected(weekNum)
-                            }
-                            isScrubbing = false
-                            onScrubbingChanged(false)
-                            highlightedWeekNumber = nil
-                            // Reset to current position
-                            scrubberPosition = livedPosition
-                        }
-                )
-
-                // Minimal endpoint labels only
-                HStack {
-                    Text("0")
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.textTertiary)
-                    Spacer()
-                    Text("\(lifeExpectancy)")
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.textTertiary)
-                }
-                .padding(.horizontal, 4)
-            }
-            .padding(.horizontal, scrubberPadding)
-        }
-        .padding(.top, 8)
-        .background(Color.bgPrimary)
-        .onAppear {
-            if !isInitialized {
-                scrubberPosition = livedPosition
-                isInitialized = true
-            }
-        }
-        .animation(.easeOut(duration: 0.12), value: isScrubbing)
-    }
-
-    // MARK: - Info Card
-
-    private func scrubberInfoCard(weekNumber: Int) -> some View {
-        let year = (weekNumber - 1) / weeksPerRow
-        let weekOfYear = (weekNumber - 1) % weeksPerRow + 1
-        let rating = ratedWeeks[weekNumber]
-        let isCurrentWeek = weekNumber == currentWeekNumber
-
-        return HStack(spacing: 12) {
-            // Week indicator
-            ZStack {
-                if let rating = rating {
-                    Circle()
-                        .fill(Color.ratingColor(for: rating))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.white)
-                } else {
-                    Circle()
-                        .stroke(isCurrentWeek ? Color.weekCurrent : Color.textTertiary, lineWidth: 2)
-                        .frame(width: 36, height: 36)
-                    if isCurrentWeek {
-                        Circle()
-                            .fill(Color.weekCurrent)
-                            .frame(width: 12, height: 12)
-                    }
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text("Week \(weekNumber.formatted())")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.textPrimary)
-
-                    if isCurrentWeek {
-                        Text("NOW")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.weekCurrent)
-                            .clipShape(Capsule())
-                    }
-                }
-
-                Text("Age \(year) • Week \(weekOfYear)")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.textSecondary)
-            }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.textTertiary)
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.bgSecondary)
-        )
-        .padding(.horizontal, 24)
     }
 }
 

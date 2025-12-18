@@ -33,15 +33,20 @@ final class LifePhase {
     // MARK: - Week Calculations
 
     /// Calculate start week number given user's birth year
+    /// Week 1 is the first week of the birth year
     func startWeek(birthYear: Int) -> Int {
         let yearsFromBirth = startYear - birthYear
-        return max(1, yearsFromBirth * 52)
+        // Year 0 (birth year) starts at week 1
+        // Each subsequent year adds 52 weeks
+        return max(1, yearsFromBirth * 52 + 1)
     }
 
     /// Calculate end week number given user's birth year
+    /// Returns the last week of the endYear (52 weeks per year)
     func endWeek(birthYear: Int) -> Int {
-        let yearsFromBirth = endYear - birthYear + 1
-        return yearsFromBirth * 52
+        let yearsFromBirth = endYear - birthYear
+        // Last week of a year is (yearOffset + 1) * 52
+        return (yearsFromBirth + 1) * 52
     }
 
     /// Check if a week number falls within this phase
