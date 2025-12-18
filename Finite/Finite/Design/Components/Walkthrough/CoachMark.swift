@@ -65,25 +65,21 @@ struct CoachMark: View {
     }
 
     private func tooltipPosition(in screenSize: CGSize) -> CGPoint {
+        // Safe area padding
+        let safeTop: CGFloat = 120
+        let safeBottom: CGFloat = 120
+
         switch step {
-        case .gridIntro, .chaptersExplanation, .addPhase, .complete:
+        case .gridIntro, .explainChapters, .addPhase, .complete:
             // Center of screen
             return CGPoint(x: screenSize.width / 2, y: screenSize.height / 2)
 
-        case .currentWeek:
-            // Above or below the grid depending on where current week is
-            let gridMidY = gridFrame.midY
-            if gridMidY < screenSize.height / 2 {
-                // Grid is in top half, put tooltip below
-                return CGPoint(x: screenSize.width / 2, y: gridFrame.maxY + 80)
-            } else {
-                // Grid is in bottom half, put tooltip above
-                return CGPoint(x: screenSize.width / 2, y: gridFrame.minY - 80)
-            }
-
-        case .viewModesIntro, .markWeek:
-            // Position above the grid
-            return CGPoint(x: screenSize.width / 2, y: gridFrame.minY - 60)
+        case .currentWeekIntro, .swipeToQuality, .markWeek:
+            // Position below the grid (safer - grid starts near top)
+            let belowGrid = gridFrame.maxY + 80
+            // Make sure it's on screen
+            let safeY = min(belowGrid, screenSize.height - safeBottom)
+            return CGPoint(x: screenSize.width / 2, y: safeY)
         }
     }
 }

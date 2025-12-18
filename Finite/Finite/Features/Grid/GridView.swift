@@ -560,14 +560,10 @@ struct GridView: View {
 
             // Tap gesture for current week quick access (Quality mode)
             // Also tap to select week within highlighted phase (Chapters mode)
-            // Also enabled during walkthrough step 2 (currentWeek) regardless of mode
             if currentViewMode == .quality || highlightedPhase != nil {
                 weekTapTarget(cellSize: cellSize, spacing: spacing)
             } else if currentViewMode == .chapters && highlightedPhase == nil {
                 // Only current week tap in Chapters when no phase highlighted
-                currentWeekTapTarget(cellSize: cellSize, spacing: spacing)
-            } else if walkthrough.currentStep == .currentWeek {
-                // Enable current week tap during walkthrough step 2 (even in Focus mode)
                 currentWeekTapTarget(cellSize: cellSize, spacing: spacing)
             }
 
@@ -749,9 +745,6 @@ struct GridView: View {
             .contentShape(Rectangle())
             .onTapGesture {
                 HapticService.shared.light()
-
-                // Notify walkthrough of current week tap
-                walkthrough.handleCurrentWeekTapped()
 
                 // Open week detail
                 selectedWeekForDetail = WeekIdentifier(value: currentWeekNumber)

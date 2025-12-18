@@ -43,22 +43,21 @@ struct SpotlightMask: View {
             // Spotlight entire grid
             return gridFrame.insetBy(dx: -12, dy: -12)
 
-        case .currentWeek:
-            // Small circular spotlight on current week
-            guard currentWeekFrame != .zero else { return nil }
-            return currentWeekFrame.insetBy(dx: -20, dy: -20)
+        case .currentWeekIntro:
+            // Spotlight on the current week
+            guard currentWeekFrame != .zero else { return gridFrame.insetBy(dx: -12, dy: -12) }
+            return currentWeekFrame.insetBy(dx: -24, dy: -24)
 
-        case .viewModesIntro:
+        case .swipeToQuality:
             // Spotlight the grid area for swiping
             return gridFrame.insetBy(dx: -12, dy: -12)
 
-        case .chaptersExplanation:
-            // Spotlight grid showing phase colors
+        case .explainChapters:
+            // Spotlight grid
             return gridFrame.insetBy(dx: -12, dy: -12)
 
         case .markWeek:
-            // Spotlight a region of the grid for long-press
-            guard currentWeekFrame != .zero && gridFrame != .zero else { return nil }
+            // Spotlight the grid for long-press
             return gridFrame.insetBy(dx: -12, dy: -12)
 
         case .addPhase, .complete:
@@ -68,7 +67,7 @@ struct SpotlightMask: View {
 
     private var spotlightCornerRadius: CGFloat {
         switch step {
-        case .currentWeek: return 100  // Circular
+        case .currentWeekIntro: return 100  // Circular for current week
         default: return 12
         }
     }

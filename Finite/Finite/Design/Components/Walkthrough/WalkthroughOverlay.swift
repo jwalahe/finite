@@ -12,9 +12,17 @@ struct WalkthroughOverlay: View {
     @ObservedObject var walkthrough: WalkthroughService
     let onPhasePrompt: () -> Void
 
+    private var currentStep: WalkthroughStep? {
+        walkthrough.currentStep
+    }
+
+    private var shouldPassTouchesThrough: Bool {
+        currentStep?.requiresUserAction == true
+    }
+
     var body: some View {
         ZStack {
-            if let step = walkthrough.currentStep {
+            if let step = currentStep {
                 // Dimmed background with spotlight cutout
                 SpotlightMask(
                     step: step,
@@ -23,19 +31,15 @@ struct WalkthroughOverlay: View {
                     dotIndicatorFrame: walkthrough.dotIndicatorFrame
                 )
                 .ignoresSafeArea()
-                .allowsHitTesting(!step.requiresUserAction)  // Let touches through for action steps
-                .onTapGesture {
-                    handleTap(for: step)
-                }
 
-                // Coach mark (text only, no background)
+                // Coach mark (text only, positioned safely on screen)
                 CoachMark(
                     step: step,
                     gridFrame: walkthrough.gridFrame,
                     onTap: { handleTap(for: step) }
                 )
 
-                // Skip button (minimal)
+                // Skip button (minimal) - always tappable
                 if walkthrough.canSkip {
                     VStack {
                         HStack {
@@ -69,10 +73,19 @@ struct WalkthroughOverlay: View {
                         }
                         .padding(.bottom, 50)
                     }
+                    .allowsHitTesting(false)
                 }
             }
         }
-        .allowsHitTesting(walkthrough.isActive)
+        // For steps that require user action (swipe, tap week, long-press),
+        // let all touches pass through to the grid underneath
+        .allowsHitTesting(!shouldPassTouchesThrough)
+        // For tap-to-continue steps, handle tap on the whole overlay
+        .onTapGesture {
+            if let step = currentStep {
+                handleTap(for: step)
+            }
+        }
     }
 
     // MARK: - Tap Handling
@@ -80,34 +93,27 @@ struct WalkthroughOverlay: View {
     private func handleTap(for step: WalkthroughStep) {
         switch step {
         case .gridIntro:
-            // Tap anywhere advances
             walkthrough.advance()
 
-        case .currentWeek:
-            // Need to tap the actual current week - let touch through
-            // The GridView will call walkthrough.handleCurrentWeekTapped()
+        case .currentWeekIntro:
+            // Tap to continue - just showing the pulsing week
+            walkthrough.advance()
+
+        case .swipeToQuality:
+            // Touches pass through - grid handles swipe
             break
 
-        case .viewModesIntro:
-            // Need to swipe - let touch through
-            // The GridView will call walkthrough.handleViewModeChanged()
-            break
-
-        case .chaptersExplanation:
-            // Tap anywhere advances
+        case .explainChapters:
             walkthrough.advance()
 
         case .addPhase:
-            // Open phase builder
             onPhasePrompt()
 
         case .markWeek:
-            // Need to long-press a week - let touch through
-            // The GridView will call walkthrough.handleWeekMarked()
+            // Touches pass through - grid handles long-press
             break
 
         case .complete:
-            // Auto-dismisses, but allow tap to dismiss early
             walkthrough.skip()
         }
     }

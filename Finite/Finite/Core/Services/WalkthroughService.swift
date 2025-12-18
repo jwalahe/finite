@@ -12,12 +12,12 @@ import Combine
 // MARK: - Walkthrough Step
 
 enum WalkthroughStep: Int, CaseIterable, Identifiable {
-    case gridIntro = 0
-    case currentWeek = 1
-    case viewModesIntro = 2
-    case chaptersExplanation = 3
-    case addPhase = 4
-    case markWeek = 5
+    case gridIntro = 0          // Explain the grid
+    case currentWeekIntro = 1   // Point out the pulsing current week
+    case swipeToQuality = 2     // Swipe to Quality view
+    case explainChapters = 3    // Explain chapters concept
+    case addPhase = 4           // Add first chapter
+    case markWeek = 5           // Long-press to mark a week (with loupe)
     case complete = 6
 
     var id: Int { rawValue }
@@ -25,11 +25,11 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .gridIntro: return "Your Life in Weeks"
-        case .currentWeek: return "You Are Here"
-        case .viewModesIntro: return "Three Perspectives"
-        case .chaptersExplanation: return "Life Chapters"
+        case .currentWeekIntro: return "You Are Here"
+        case .swipeToQuality: return "Three Views"
+        case .explainChapters: return "Life Chapters"
         case .addPhase: return "Add Your First Chapter"
-        case .markWeek: return "Reflect on a Week"
+        case .markWeek: return "Rate a Week"
         case .complete: return "You're Ready"
         }
     }
@@ -38,16 +38,16 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
         switch self {
         case .gridIntro:
             return "Each dot is one week of your life.\nThe filled ones are behind you."
-        case .currentWeek:
-            return "This glowing dot is today.\nTap it."
-        case .viewModesIntro:
-            return "See your life through different lenses.\nSwipe left to try."
-        case .chaptersExplanation:
+        case .currentWeekIntro:
+            return "The glowing dot is this week."
+        case .swipeToQuality:
+            return "Swipe left to see your weeks in color."
+        case .explainChapters:
             return "Color your past by adding life chapters—school, career, adventures."
         case .addPhase:
             return "Let's add your first chapter."
         case .markWeek:
-            return "Long-press any past week to record how it felt."
+            return "Hold any week to rate it.\nA magnifier helps you find your spot."
         case .complete:
             return "Take your time. Reflect weekly.\nYour life is finite—make it count."
         }
@@ -55,20 +55,20 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
 
     var requiresUserAction: Bool {
         switch self {
-        case .gridIntro, .chaptersExplanation: return false  // Tap anywhere
-        case .currentWeek, .viewModesIntro, .addPhase, .markWeek: return true  // Specific action
+        case .gridIntro, .currentWeekIntro, .explainChapters: return false  // Tap anywhere
+        case .swipeToQuality, .addPhase, .markWeek: return true  // Specific action
         case .complete: return false  // Auto-dismiss
         }
     }
 
     var actionHint: String? {
         switch self {
-        case .gridIntro: return "Tap anywhere to continue"
-        case .currentWeek: return "Tap the glowing week"
-        case .viewModesIntro: return "Swipe left on the grid"
-        case .chaptersExplanation: return "Tap to continue"
+        case .gridIntro: return "Tap to continue"
+        case .currentWeekIntro: return "Tap to continue"
+        case .swipeToQuality: return "Swipe left"
+        case .explainChapters: return "Tap to continue"
         case .addPhase: return nil  // Modal handles this
-        case .markWeek: return "Long-press any filled week"
+        case .markWeek: return "Hold any filled week"
         case .complete: return nil
         }
     }
@@ -84,7 +84,6 @@ final class WalkthroughService: ObservableObject {
     // MARK: - Published State
     @Published var currentStep: WalkthroughStep?
     @Published var isActive: Bool = false
-    @Published var showCelebration: Bool = false
 
     // MARK: - Frame References (set by GridView)
     @Published var gridFrame: CGRect = .zero
@@ -130,11 +129,6 @@ final class WalkthroughService: ObservableObject {
 
     func advance() {
         guard let current = currentStep else { return }
-
-        // Show celebration for action-based steps
-        if current.requiresUserAction {
-            triggerCelebration()
-        }
 
         // Find next step
         guard let currentIndex = WalkthroughStep.allCases.firstIndex(of: current) else { return }
@@ -190,14 +184,9 @@ final class WalkthroughService: ObservableObject {
 
     // MARK: - Action Detection
 
-    func handleCurrentWeekTapped() {
-        if currentStep == .currentWeek {
-            advance()
-        }
-    }
-
     func handleViewModeChanged(to mode: ViewMode) {
-        if currentStep == .viewModesIntro && mode == .chapters {
+        // Advance when user reaches Quality view
+        if currentStep == .swipeToQuality && mode == .quality {
             advance()
         }
     }
@@ -217,17 +206,6 @@ final class WalkthroughService: ObservableObject {
     func handleWeekMarked() {
         if currentStep == .markWeek {
             advance()
-        }
-    }
-
-    // MARK: - Private
-
-    private func triggerCelebration() {
-        showCelebration = true
-        HapticService.shared.success()
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
-            self?.showCelebration = false
         }
     }
 }
