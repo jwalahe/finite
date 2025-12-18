@@ -15,12 +15,15 @@ struct PhaseBuilderView: View {
     let onPhaseAdded: (LifePhase) -> Void
 
     var body: some View {
-        PhaseFormView(
-            mode: .add,
-            user: user,
-            existingPhases: existingPhases,
-            onSave: onPhaseAdded
-        )
+        // Wrap in NavigationStack for sheet presentation
+        NavigationStack {
+            PhaseFormView(
+                mode: .add,
+                user: user,
+                existingPhases: existingPhases,
+                onSave: onPhaseAdded
+            )
+        }
     }
 }
 

@@ -94,105 +94,17 @@ struct PhaseFormView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Grid preview
-                    PhaseGridPreviewNew(
-                        user: user,
-                        existingPhases: otherPhases,
-                        previewStartYear: startYear,
-                        previewEndYear: endYear,
-                        previewColor: selectedColor.color
-                    )
-                    .frame(height: 100)
-                    .padding(.horizontal, 24)
-
-                    Divider()
-                        .padding(.horizontal, 24)
-
-                    // Chapter name
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Chapter name")
-                            .font(.caption)
-                            .foregroundStyle(Color.textSecondary)
-
-                        TextField("College, First Job, Travel Year...", text: $name)
-                            .font(.body)
-                            .padding(12)
-                            .background(Color.bgSecondary)
-                            .cornerRadius(8)
-                            .focused($isNameFieldFocused)
-                    }
-                    .padding(.horizontal, 24)
-
-                    // Year pickers
-                    YearWheelPicker(
-                        startYear: $startYear,
-                        endYear: $endYear,
-                        minYear: user.birthYear,
-                        maxYear: user.currentYear
-                    )
-                    .padding(.horizontal, 24)
-
-                    // Color picker (4x4 grid)
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Chapter color")
-                            .font(.caption)
-                            .foregroundStyle(Color.textSecondary)
-
-                        PhaseColorGrid(selectedColor: $selectedColor)
-                    }
-                    .padding(.horizontal, 24)
-
-                    // Rating (optional)
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("How was it overall? (optional)")
-                            .font(.caption)
-                            .foregroundStyle(Color.textSecondary)
-
-                        PhaseRatingGrid(rating: $rating)
-                    }
-                    .padding(.horizontal, 24)
-
-                    Spacer(minLength: 24)
-
-                    // Primary action button
-                    Button(action: savePhase) {
-                        Text(saveButtonTitle)
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(isValid ? Color.bgPrimary : Color.textTertiary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(isValid ? Color.textPrimary : Color.bgTertiary)
-                            .cornerRadius(12)
-                    }
-                    .disabled(!isValid)
-                    .buttonStyle(ScaleButtonStyle())
-                    .padding(.horizontal, 24)
-
-                    // Delete button (edit mode only)
-                    if isEditMode, onDelete != nil {
-                        Button(action: { showDeleteConfirmation = true }) {
-                            Text("Delete Chapter")
-                                .font(.body)
-                                .foregroundStyle(Color.ratingAwful)
-                        }
-                        .padding(.top, 8)
-                        .padding(.bottom, 24)
-                    } else {
-                        Spacer(minLength: 24)
-                    }
-                }
-            }
-            .background(Color.bgPrimary)
+        formContent
             .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        HapticService.shared.light()
-                        dismiss()
+                // Only show Cancel button in add mode (presented as sheet)
+                if !isEditMode {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            HapticService.shared.light()
+                            dismiss()
+                        }
                     }
                 }
             }
@@ -206,7 +118,100 @@ struct PhaseFormView: View {
             } message: {
                 Text("This will remove \"\(name)\" from your life chapters. This cannot be undone.")
             }
+    }
+
+    private var formContent: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                // Grid preview
+                PhaseGridPreviewNew(
+                    user: user,
+                    existingPhases: otherPhases,
+                    previewStartYear: startYear,
+                    previewEndYear: endYear,
+                    previewColor: selectedColor.color
+                )
+                .frame(height: 100)
+                .padding(.horizontal, 24)
+
+                Divider()
+                    .padding(.horizontal, 24)
+
+                // Chapter name
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Chapter name")
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+
+                    TextField("College, First Job, Travel Year...", text: $name)
+                        .font(.body)
+                        .padding(12)
+                        .background(Color.bgSecondary)
+                        .cornerRadius(8)
+                        .focused($isNameFieldFocused)
+                }
+                .padding(.horizontal, 24)
+
+                // Year pickers
+                YearWheelPicker(
+                    startYear: $startYear,
+                    endYear: $endYear,
+                    minYear: user.birthYear,
+                    maxYear: user.currentYear
+                )
+                .padding(.horizontal, 24)
+
+                // Color picker (4x4 grid)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Chapter color")
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+
+                    PhaseColorGrid(selectedColor: $selectedColor)
+                }
+                .padding(.horizontal, 24)
+
+                // Rating (optional)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("How was it overall? (optional)")
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+
+                    PhaseRatingGrid(rating: $rating)
+                }
+                .padding(.horizontal, 24)
+
+                Spacer(minLength: 24)
+
+                // Primary action button
+                Button(action: savePhase) {
+                    Text(saveButtonTitle)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(isValid ? Color.bgPrimary : Color.textTertiary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(isValid ? Color.textPrimary : Color.bgTertiary)
+                        .cornerRadius(12)
+                }
+                .disabled(!isValid)
+                .buttonStyle(ScaleButtonStyle())
+                .padding(.horizontal, 24)
+
+                // Delete button (edit mode only)
+                if isEditMode, onDelete != nil {
+                    Button(action: { showDeleteConfirmation = true }) {
+                        Text("Delete Chapter")
+                            .font(.body)
+                            .foregroundStyle(Color.ratingAwful)
+                    }
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
+                } else {
+                    Spacer(minLength: 24)
+                }
+            }
         }
+        .background(Color.bgPrimary)
     }
 
     private func savePhase() {
