@@ -53,6 +53,9 @@ struct GridView: View {
     @State private var showPhasePrompt: Bool = false
     @State private var showPhaseBuilder: Bool = false
 
+    // Phase editing (from TimeSpine tap or PhaseContextBar tap)
+    @State private var phaseToEdit: LifePhase?
+
     // Mode label flash
     @State private var showModeLabel: Bool = false
 
@@ -384,6 +387,9 @@ struct GridView: View {
                     }
                 }
         }
+        .sheet(item: $phaseToEdit) { phase in
+            PhaseEditView(user: user, phase: phase)
+        }
         .overlay {
             if showPhasePrompt {
                 PhasePromptOverlay(
@@ -414,10 +420,26 @@ struct GridView: View {
 
         return HStack(alignment: .top, spacing: 0) {
             // Time Spine (Chapters view only) - CRAFT_SPEC: 12pt visual, 44pt tap target
-            if currentViewMode == .chapters && hasRevealCompleted && !phases.isEmpty {
-                TimeSpine(user: user, phases: phases, gridHeight: gridHeight) { phase, yPos in
-                    handleSpineTap(phase: phase, yPosition: yPos)
-                }
+            // Tap = Edit, Long-press = GhostPhase info, "+" = Add
+            if currentViewMode == .chapters && hasRevealCompleted {
+                TimeSpine(
+                    user: user,
+                    phases: phases,
+                    gridHeight: gridHeight,
+                    onPhaseEdit: { phase in
+                        phaseToEdit = phase
+                    },
+                    onPhaseLongPress: { phase, yPos in
+                        handleSpineTap(phase: phase, yPosition: yPos)
+                    },
+                    onAddPhase: {
+                        showPhaseBuilder = true
+                        // Advance walkthrough if on addPhase step
+                        if walkthrough.currentStep == .addPhase {
+                            // Will be handled by sheet onDisappear
+                        }
+                    }
+                )
                 .background(
                     GeometryReader { geo in
                         Color.clear.preference(
@@ -428,6 +450,9 @@ struct GridView: View {
                 )
                 .onPreferenceChange(SpineFrameKey.self) { frame in
                     walkthrough.spineFrame = frame
+                }
+                .onPreferenceChange(AddPhaseButtonFrameKey.self) { frame in
+                    walkthrough.addPhaseButtonFrame = frame
                 }
                 .transition(.opacity.combined(with: .move(edge: .leading)))
             }
@@ -870,8 +895,7 @@ struct GridView: View {
     }
 
     // MARK: - View Mode Footer Content
-    // Each view has a "ghost" element at 8% opacity that summons on interaction
-    // Philosophy: Information appears only when sought, then gracefully recedes
+    // Each view has contextual content in the footer
 
     @ViewBuilder
     private var viewModeFooterContent: some View {
@@ -881,12 +905,36 @@ struct GridView: View {
             GhostNumber(weeksRemaining: user.weeksRemaining)
 
         case .chapters:
-            // Ghost phase - summoned when spine is tapped
-            GhostPhase(user: user, phases: phases, summonedPhase: $highlightedPhase)
+            // Phase context bar - shows current/highlighted phase, tappable to edit
+            PhaseContextBar(
+                user: user,
+                phases: phases,
+                highlightedPhase: highlightedPhase
+            ) {
+                // Tap action: edit current phase or add new
+                if let phase = highlightedPhase ?? currentPhaseForUser {
+                    phaseToEdit = phase
+                } else {
+                    showPhaseBuilder = true
+                }
+            }
+            .padding(.horizontal, 16)
 
         case .quality:
             // "Edit This Week" button
             markCurrentWeekButton
+        }
+    }
+
+    // Current phase for the user's current week
+    private var currentPhaseForUser: LifePhase? {
+        let birthYear = user.birthYear
+        let currentWeek = user.currentWeekNumber
+
+        return phases.first { phase in
+            let start = phase.startWeek(birthYear: birthYear)
+            let end = phase.endWeek(birthYear: birthYear)
+            return currentWeek >= start && currentWeek <= end
         }
     }
 

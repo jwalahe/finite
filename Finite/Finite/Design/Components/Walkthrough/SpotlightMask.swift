@@ -14,6 +14,7 @@ struct SpotlightMask: View {
     let currentWeekFrame: CGRect
     let dotIndicatorFrame: CGRect
     let spineFrame: CGRect
+    let addPhaseButtonFrame: CGRect
 
     var body: some View {
         // Semi-transparent overlay with cutout
@@ -66,7 +67,12 @@ struct SpotlightMask: View {
             // Spotlight the grid for long-press
             return gridFrame.insetBy(dx: -12, dy: -12)
 
-        case .addPhase, .complete:
+        case .addPhase:
+            // Spotlight the "+" button on TimeSpine
+            guard addPhaseButtonFrame != .zero else { return spineFrame.insetBy(dx: -8, dy: -8) }
+            return addPhaseButtonFrame.insetBy(dx: -12, dy: -12)
+
+        case .complete:
             return nil  // Full dim, no spotlight
         }
     }
@@ -74,6 +80,7 @@ struct SpotlightMask: View {
     private var spotlightCornerRadius: CGFloat {
         switch step {
         case .currentWeekIntro: return 100  // Circular for current week
+        case .addPhase: return 24  // Rounded for button
         default: return 12
         }
     }

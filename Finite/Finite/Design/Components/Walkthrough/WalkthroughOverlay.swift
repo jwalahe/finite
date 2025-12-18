@@ -29,7 +29,8 @@ struct WalkthroughOverlay: View {
                     gridFrame: walkthrough.gridFrame,
                     currentWeekFrame: walkthrough.currentWeekFrame,
                     dotIndicatorFrame: walkthrough.dotIndicatorFrame,
-                    spineFrame: walkthrough.spineFrame
+                    spineFrame: walkthrough.spineFrame,
+                    addPhaseButtonFrame: walkthrough.addPhaseButtonFrame
                 )
                 .ignoresSafeArea()
 
@@ -107,8 +108,8 @@ struct WalkthroughOverlay: View {
             walkthrough.advance()
 
         case .addPhase:
-            // Open the phase form
-            onPhasePrompt()
+            // Touches pass through - user taps the + button directly
+            break
 
         case .tapSpine:
             // Just informational - tap to continue

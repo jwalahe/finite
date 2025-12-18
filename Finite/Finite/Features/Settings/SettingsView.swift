@@ -13,12 +13,10 @@ struct SettingsView: View {
     let user: User
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \LifePhase.sortOrder) private var phases: [LifePhase]
 
     // Sheet states
     @State private var showBirthDateSheet: Bool = false
     @State private var showLifeExpectancySheet: Bool = false
-    @State private var showPhaseBuilder: Bool = false
     @State private var showEraseConfirmation: Bool = false
 
     // Local state for notification settings (synced to user model)
@@ -39,9 +37,6 @@ struct SettingsView: View {
                 VStack(spacing: 32) {
                     // YOUR LIFE
                     yourLifeSection
-
-                    // CHAPTERS
-                    chaptersSection
 
                     // REMINDERS
                     remindersSection
@@ -82,11 +77,6 @@ struct SettingsView: View {
                 set: { user.lifeExpectancy = $0 }
             ))
         }
-        .sheet(isPresented: $showPhaseBuilder) {
-            PhaseBuilderView(user: user, existingPhases: phases) { _ in
-                // Phase added, sheet will dismiss
-            }
-        }
         .alert("Erase Everything?", isPresented: $showEraseConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Erase", role: .destructive) {
@@ -115,59 +105,6 @@ struct SettingsView: View {
                 value: "\(user.lifeExpectancy) years"
             ) {
                 showLifeExpectancySheet = true
-            }
-        }
-    }
-
-    // MARK: - CHAPTERS Section
-
-    private var chaptersSection: some View {
-        SettingsSection(title: "CHAPTERS") {
-            if phases.isEmpty {
-                // No phases yet
-                SettingsRow(label: "Add life chapters", value: "+") {
-                    showPhaseBuilder = true
-                }
-            } else {
-                // Show phases with navigation
-                ForEach(Array(phases.enumerated()), id: \.element.id) { index, phase in
-                    if index > 0 {
-                        SettingsDivider()
-                    }
-
-                    NavigationLink {
-                        PhaseEditView(user: user, phase: phase)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Circle()
-                                .fill(Color.fromHex(phase.colorHex))
-                                .frame(width: 10, height: 10)
-
-                            Text(phase.name)
-                                .font(.body)
-                                .foregroundStyle(Color.textPrimary)
-
-                            Spacer()
-
-                            Text("\(String(phase.startYear))–\(String(phase.endYear))")
-                                .font(.callout)
-                                .foregroundStyle(Color.textSecondary)
-
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(Color.textTertiary)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                    }
-                }
-
-                SettingsDivider()
-
-                // Add more button
-                SettingsRow(label: "Add chapter", value: "+") {
-                    showPhaseBuilder = true
-                }
             }
         }
     }

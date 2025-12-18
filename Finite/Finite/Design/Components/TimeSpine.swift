@@ -5,6 +5,11 @@
 //  Vertical strip on left edge showing phase colors proportionally mapped to lifespan
 //  CRAFT_SPEC: 12pt visual width, 44pt tap target, only in Chapters view
 //
+//  Interactions:
+//  - Tap phase segment → Edit phase (opens sheet)
+//  - Long-press phase segment → Show GhostPhase info
+//  - Tap "+" button → Add new phase
+//
 
 import SwiftUI
 
@@ -12,15 +17,93 @@ struct TimeSpine: View {
     let user: User
     let phases: [LifePhase]
     let gridHeight: CGFloat
-    let onPhaseTapped: (LifePhase, CGFloat) -> Void  // Phase and Y position
+
+    // Callbacks
+    let onPhaseEdit: ((LifePhase) -> Void)?       // Tap = Edit
+    let onPhaseLongPress: ((LifePhase, CGFloat) -> Void)?  // Long-press = GhostPhase info
+    let onAddPhase: (() -> Void)?                 // Tap + = Add
 
     // CRAFT_SPEC: 12pt visual, 44pt tap target
     private let visualWidth: CGFloat = 12
     private let tapTargetWidth: CGFloat = 44
 
+    // For backward compatibility
+    init(
+        user: User,
+        phases: [LifePhase],
+        gridHeight: CGFloat,
+        onPhaseTapped: @escaping (LifePhase, CGFloat) -> Void
+    ) {
+        self.user = user
+        self.phases = phases
+        self.gridHeight = gridHeight
+        self.onPhaseEdit = nil
+        self.onPhaseLongPress = onPhaseTapped
+        self.onAddPhase = nil
+    }
+
+    // New initializer with all callbacks
+    init(
+        user: User,
+        phases: [LifePhase],
+        gridHeight: CGFloat,
+        onPhaseEdit: ((LifePhase) -> Void)? = nil,
+        onPhaseLongPress: ((LifePhase, CGFloat) -> Void)? = nil,
+        onAddPhase: (() -> Void)? = nil
+    ) {
+        self.user = user
+        self.phases = phases
+        self.gridHeight = gridHeight
+        self.onPhaseEdit = onPhaseEdit
+        self.onPhaseLongPress = onPhaseLongPress
+        self.onAddPhase = onAddPhase
+    }
+
     var body: some View {
-        spineVisual
-            .frame(width: tapTargetWidth)
+        VStack(spacing: 0) {
+            spineVisual
+
+            // Add button at bottom
+            if onAddPhase != nil {
+                addPhaseButton
+                    .padding(.top, 12)
+            }
+        }
+        .frame(width: tapTargetWidth)
+    }
+
+    // MARK: - Add Phase Button
+
+    private var addPhaseButton: some View {
+        Button {
+            HapticService.shared.light()
+            onAddPhase?()
+        } label: {
+            VStack(spacing: 4) {
+                ZStack {
+                    Circle()
+                        .fill(Color.bgTertiary)
+                        .frame(width: 32, height: 32)
+
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.textSecondary)
+                }
+
+                Text("ADD")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(Color.textTertiary)
+            }
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(
+                    key: AddPhaseButtonFrameKey.self,
+                    value: geo.frame(in: .global)
+                )
+            }
+        )
     }
 
     // MARK: - Spine Visual
@@ -103,30 +186,73 @@ struct TimeSpine: View {
             }
             .frame(width: tapTargetWidth, height: gridHeight)
             .contentShape(Rectangle())
-            .onTapGesture { location in
-                handleTap(at: location.y, in: geo.size.height)
-            }
+            .gesture(
+                // Tap = Edit phase
+                SpatialTapGesture()
+                    .onEnded { value in
+                        handleTap(at: value.location.y, in: geo.size.height)
+                    }
+            )
+            .gesture(
+                // Long-press = GhostPhase info (uses sequenced gesture to get location)
+                LongPressGesture(minimumDuration: 0.3)
+                    .sequenced(before: DragGesture(minimumDistance: 0))
+                    .onEnded { value in
+                        switch value {
+                        case .second(true, let drag):
+                            if let location = drag?.location {
+                                handleLongPress(at: location.y, in: geo.size.height)
+                            }
+                        default:
+                            break
+                        }
+                    }
+            )
         }
         .frame(width: tapTargetWidth, height: gridHeight)
     }
 
-    // MARK: - Tap Handling
+    // MARK: - Gesture Handling
 
     private func handleTap(at y: CGFloat, in height: CGFloat) {
-        // Calculate which week was tapped
+        guard let phase = findPhase(at: y, in: height) else { return }
+
+        HapticService.shared.light()
+
+        // If edit callback exists, use it; otherwise fall back to long-press behavior
+        if let onPhaseEdit = onPhaseEdit {
+            onPhaseEdit(phase)
+        } else {
+            onPhaseLongPress?(phase, y)
+        }
+    }
+
+    private func handleLongPress(at y: CGFloat, in height: CGFloat) {
+        guard let phase = findPhase(at: y, in: height) else { return }
+
+        HapticService.shared.medium()
+        onPhaseLongPress?(phase, y)
+    }
+
+    private func findPhase(at y: CGFloat, in height: CGFloat) -> LifePhase? {
         let totalWeeks = user.totalWeeks
         let tappedWeek = Int((y / height) * CGFloat(totalWeeks)) + 1
 
-        // Find phase at this week
         let birthYear = user.birthYear
-        if let phase = phases.first(where: { phase in
+        return phases.first { phase in
             let start = phase.startWeek(birthYear: birthYear)
             let end = phase.endWeek(birthYear: birthYear)
             return tappedWeek >= start && tappedWeek <= end
-        }) {
-            HapticService.shared.light()
-            onPhaseTapped(phase, y)
         }
+    }
+}
+
+// MARK: - Preference Key for Add Button Frame
+
+struct AddPhaseButtonFrameKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
     }
 }
 
@@ -165,9 +291,20 @@ struct SpinePhaseLabel: View {
     let phase3 = LifePhase(name: "Career", startYear: 2018, endYear: 2024, colorHex: "#059669")
 
     return HStack {
-        TimeSpine(user: user, phases: [phase1, phase2, phase3], gridHeight: 600) { phase, y in
-            print("Tapped: \(phase.name) at \(y)")
-        }
+        TimeSpine(
+            user: user,
+            phases: [phase1, phase2, phase3],
+            gridHeight: 600,
+            onPhaseEdit: { phase in
+                print("Edit: \(phase.name)")
+            },
+            onPhaseLongPress: { phase, y in
+                print("Info: \(phase.name) at \(y)")
+            },
+            onAddPhase: {
+                print("Add phase")
+            }
+        )
         Spacer()
     }
     .padding()

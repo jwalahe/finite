@@ -49,9 +49,9 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
         case .explainChapters:
             return "Chapters are phases of your life—school, career, adventures."
         case .addPhase:
-            return "Tap anywhere to add your first chapter."
+            return "Tap the + button to add your first chapter."
         case .tapSpine:
-            return "Tap any color on the timeline to see that chapter's details."
+            return "Tap a chapter to edit it.\nHold to see its details."
         case .swipeToQuality:
             return "Swipe left once more to rate individual weeks."
         case .markWeek:
@@ -63,8 +63,8 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
 
     var requiresUserAction: Bool {
         switch self {
-        case .gridIntro, .currentWeekIntro, .explainChapters, .addPhase, .tapSpine: return false  // Tap overlay
-        case .swipeToChapters, .swipeToQuality, .markWeek: return true  // Grid handles action
+        case .gridIntro, .currentWeekIntro, .explainChapters, .tapSpine: return false  // Tap overlay
+        case .swipeToChapters, .addPhase, .swipeToQuality, .markWeek: return true  // Grid handles action
         case .complete: return false  // Auto-dismiss
         }
     }
@@ -75,7 +75,7 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
         case .currentWeekIntro: return "Tap to continue"
         case .swipeToChapters: return "Swipe left"
         case .explainChapters: return "Tap to continue"
-        case .addPhase: return "Tap to add"
+        case .addPhase: return "Tap the + button"
         case .tapSpine: return "Tap to continue"
         case .swipeToQuality: return "Swipe left"
         case .markWeek: return "Hold any filled week"
@@ -100,6 +100,7 @@ final class WalkthroughService: ObservableObject {
     @Published var currentWeekFrame: CGRect = .zero
     @Published var dotIndicatorFrame: CGRect = .zero
     @Published var spineFrame: CGRect = .zero
+    @Published var addPhaseButtonFrame: CGRect = .zero
 
     // MARK: - Persistence
     @AppStorage("hasCompletedWalkthrough") private var hasCompleted: Bool = false
