@@ -560,10 +560,14 @@ struct GridView: View {
 
             // Tap gesture for current week quick access (Quality mode)
             // Also tap to select week within highlighted phase (Chapters mode)
+            // Also enabled during walkthrough step 2 (currentWeek) regardless of mode
             if currentViewMode == .quality || highlightedPhase != nil {
                 weekTapTarget(cellSize: cellSize, spacing: spacing)
             } else if currentViewMode == .chapters && highlightedPhase == nil {
                 // Only current week tap in Chapters when no phase highlighted
+                currentWeekTapTarget(cellSize: cellSize, spacing: spacing)
+            } else if walkthrough.currentStep == .currentWeek {
+                // Enable current week tap during walkthrough step 2 (even in Focus mode)
                 currentWeekTapTarget(cellSize: cellSize, spacing: spacing)
             }
 
@@ -681,34 +685,52 @@ struct GridView: View {
         let x = CGFloat(col) * (cellSize + spacing) + cellSize / 2
         let y = CGFloat(row) * (cellSize + spacing) + cellSize / 2
 
-        return TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-            let elapsed = timeline.date.timeIntervalSinceReferenceDate
-            let phase = (sin(elapsed * .pi * 0.8) + 1) / 2
-            let ringScale = 1.8 + (0.6 * phase)
-            let ringOpacity = 0.6 - (0.4 * phase)
+        return ZStack {
+            // Animated pulse ring
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                let elapsed = timeline.date.timeIntervalSinceReferenceDate
+                let phase = (sin(elapsed * .pi * 0.8) + 1) / 2
+                let ringScale = 1.8 + (0.6 * phase)
+                let ringOpacity = 0.6 - (0.4 * phase)
 
+                Circle()
+                    .stroke(Color.weekCurrent.opacity(ringOpacity), lineWidth: 2)
+                    .frame(width: cellSize * ringScale, height: cellSize * ringScale)
+                    .position(x: x, y: y)
+            }
+
+            // Frame tracker for walkthrough (static, outside TimelineView)
             Circle()
-                .stroke(Color.weekCurrent.opacity(ringOpacity), lineWidth: 2)
-                .frame(width: cellSize * ringScale, height: cellSize * ringScale)
+                .fill(Color.clear)
+                .frame(width: cellSize, height: cellSize)
                 .position(x: x, y: y)
                 .background(
                     GeometryReader { geo in
                         Color.clear
-                            .preference(
-                                key: CurrentWeekFrameKey.self,
-                                value: CGRect(
-                                    x: geo.frame(in: .global).midX - cellSize / 2,
-                                    y: geo.frame(in: .global).midY - cellSize / 2,
+                            .onAppear {
+                                // Calculate frame based on position within parent
+                                let parentFrame = geo.frame(in: .global)
+                                let weekFrame = CGRect(
+                                    x: parentFrame.minX + x - cellSize / 2,
+                                    y: parentFrame.minY + y - cellSize / 2,
                                     width: cellSize,
                                     height: cellSize
                                 )
-                            )
+                                currentWeekFrameForWalkthrough = weekFrame
+                                walkthrough.currentWeekFrame = weekFrame
+                            }
+                            .onChange(of: geo.frame(in: .global)) { _, newFrame in
+                                let weekFrame = CGRect(
+                                    x: newFrame.minX + x - cellSize / 2,
+                                    y: newFrame.minY + y - cellSize / 2,
+                                    width: cellSize,
+                                    height: cellSize
+                                )
+                                currentWeekFrameForWalkthrough = weekFrame
+                                walkthrough.currentWeekFrame = weekFrame
+                            }
                     }
                 )
-        }
-        .onPreferenceChange(CurrentWeekFrameKey.self) { frame in
-            currentWeekFrameForWalkthrough = frame
-            walkthrough.currentWeekFrame = frame
         }
         .allowsHitTesting(false)
     }
