@@ -73,8 +73,8 @@ struct PhaseContextBar: View {
                     .fill(Color.fromHex(phase.colorHex))
                     .frame(width: 10, height: 10)
 
-                // Phase info
-                Text("\(phase.name) • \(phase.startYear)–\(phase.endYear) • \(weeksInPhase(phase)) weeks")
+                // Phase info (use String() to avoid locale number formatting like "2,001")
+                Text("\(phase.name) • \(String(phase.startYear))–\(String(phase.endYear)) • \(weeksInPhase(phase)) weeks")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color.fromHex(phase.colorHex))
 

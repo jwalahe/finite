@@ -187,25 +187,17 @@ struct TimeSpine: View {
             .frame(width: tapTargetWidth, height: gridHeight)
             .contentShape(Rectangle())
             .gesture(
-                // Tap = Edit phase
+                // Single tap = Show GhostPhase info
                 SpatialTapGesture()
                     .onEnded { value in
-                        handleTap(at: value.location.y, in: geo.size.height)
+                        handleSingleTap(at: value.location.y, in: geo.size.height)
                     }
             )
             .gesture(
-                // Long-press = GhostPhase info (uses sequenced gesture to get location)
-                LongPressGesture(minimumDuration: 0.3)
-                    .sequenced(before: DragGesture(minimumDistance: 0))
+                // Double tap = Edit phase
+                SpatialTapGesture(count: 2)
                     .onEnded { value in
-                        switch value {
-                        case .second(true, let drag):
-                            if let location = drag?.location {
-                                handleLongPress(at: location.y, in: geo.size.height)
-                            }
-                        default:
-                            break
-                        }
+                        handleDoubleTap(at: value.location.y, in: geo.size.height)
                     }
             )
         }
@@ -214,24 +206,20 @@ struct TimeSpine: View {
 
     // MARK: - Gesture Handling
 
-    private func handleTap(at y: CGFloat, in height: CGFloat) {
+    private func handleSingleTap(at y: CGFloat, in height: CGFloat) {
         guard let phase = findPhase(at: y, in: height) else { return }
 
         HapticService.shared.light()
-
-        // If edit callback exists, use it; otherwise fall back to long-press behavior
-        if let onPhaseEdit = onPhaseEdit {
-            onPhaseEdit(phase)
-        } else {
-            onPhaseLongPress?(phase, y)
-        }
+        // Single tap shows GhostPhase info
+        onPhaseLongPress?(phase, y)
     }
 
-    private func handleLongPress(at y: CGFloat, in height: CGFloat) {
+    private func handleDoubleTap(at y: CGFloat, in height: CGFloat) {
         guard let phase = findPhase(at: y, in: height) else { return }
 
         HapticService.shared.medium()
-        onPhaseLongPress?(phase, y)
+        // Double tap opens phase editor
+        onPhaseEdit?(phase)
     }
 
     private func findPhase(at y: CGFloat, in height: CGFloat) -> LifePhase? {

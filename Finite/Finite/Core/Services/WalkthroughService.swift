@@ -51,7 +51,7 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
         case .addPhase:
             return "Tap the + button to add your first chapter."
         case .tapSpine:
-            return "Tap a chapter to edit it.\nHold to see its details."
+            return "Tap a chapter to see its details.\nDouble-tap to edit."
         case .swipeToQuality:
             return "Swipe left once more to rate individual weeks."
         case .markWeek:

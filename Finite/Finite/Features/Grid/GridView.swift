@@ -419,9 +419,10 @@ struct GridView: View {
         let showCurrentAge = distanceToDecade > 2
 
         return HStack(alignment: .top, spacing: 0) {
-            // Time Spine (Chapters view only) - CRAFT_SPEC: 12pt visual, 44pt tap target
-            // Tap = Edit, Long-press = GhostPhase info, "+" = Add
-            if currentViewMode == .chapters && hasRevealCompleted {
+            // Time Spine (Chapters view only, when phases exist OR during addPhase walkthrough step)
+            // Tap = show info, Double-tap = edit, "+" = Add
+            let showSpineForWalkthrough = walkthrough.isActive && walkthrough.currentStep == .addPhase
+            if currentViewMode == .chapters && hasRevealCompleted && (!phases.isEmpty || showSpineForWalkthrough) {
                 TimeSpine(
                     user: user,
                     phases: phases,
@@ -993,6 +994,10 @@ struct GridView: View {
 
             // Start walkthrough if needed (replaces old phase prompt and swipe hint)
             if walkthrough.shouldShow {
+                // Ensure we start in Focus view for walkthrough
+                currentViewMode = .focus
+                user.currentViewMode = .focus
+                rebuildGridColorsCache()
                 walkthrough.startIfNeeded()
             } else {
                 // CRAFT_SPEC: Phase prompt 1s after Reveal completes
