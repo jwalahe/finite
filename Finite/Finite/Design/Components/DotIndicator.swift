@@ -2,7 +2,7 @@
 //  DotIndicator.swift
 //  Finite
 //
-//  Three-dot indicator for view mode (Chapters/Quality/Focus)
+//  Four-dot indicator for view mode (Chapters/Quality/Focus/Horizons)
 //  CRAFT_SPEC: 8pt diameter dots, 8pt spacing, crossfade 0.2s
 //
 
@@ -32,6 +32,7 @@ struct DotIndicator: View {
         DotIndicator(currentMode: .chapters)
         DotIndicator(currentMode: .quality)
         DotIndicator(currentMode: .focus)
+        DotIndicator(currentMode: .horizons)
     }
     .padding()
     .background(Color.bgPrimary)

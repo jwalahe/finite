@@ -168,6 +168,15 @@ struct GridView: View {
                 } else {
                     color = .gridUnfilled
                 }
+            case .horizons:
+                // Horizons mode: past dimmed, future normal, milestones handled separately
+                if isCurrent {
+                    color = .weekCurrent
+                } else if isLived {
+                    color = .gridFilled.opacity(0.3)  // Dimmed past
+                } else {
+                    color = .gridUnfilled
+                }
             }
             colors.append(color)
         }
@@ -924,6 +933,21 @@ struct GridView: View {
         case .quality:
             // "Edit This Week" button
             markCurrentWeekButton
+
+        case .horizons:
+            // Milestone context bar - placeholder until MilestoneContextBar is created
+            Text("Set your first horizon")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
+                        .foregroundStyle(Color.textTertiary)
+                )
+                .padding(.horizontal, 24)
         }
     }
 
@@ -1133,6 +1157,7 @@ struct GridView: View {
         case .chapters: return "book.pages"
         case .quality: return "paintpalette.fill"
         case .focus: return "circle.grid.3x3"
+        case .horizons: return "hexagon.fill"
         }
     }
 

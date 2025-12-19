@@ -15,6 +15,7 @@ struct FiniteApp: App {
             User.self,
             Week.self,
             LifePhase.self,
+            Milestone.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

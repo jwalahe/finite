@@ -36,4 +36,15 @@ enum WeekCategory: String, Codable, CaseIterable {
         case .adventure: return "airplane"
         }
     }
+
+    var colorHex: String {
+        switch self {
+        case .work: return "#0D9488"       // Teal
+        case .health: return "#DC2626"     // Red
+        case .growth: return "#4F46E5"     // Indigo
+        case .relationships: return "#E11D48" // Rose
+        case .rest: return "#6366F1"       // Slate blue
+        case .adventure: return "#059669"  // Emerald
+        }
+    }
 }
