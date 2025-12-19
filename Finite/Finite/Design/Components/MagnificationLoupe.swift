@@ -105,6 +105,7 @@ class LoupeState: ObservableObject {
     @Published var isActive: Bool = false
     @Published var position: CGPoint = .zero
     @Published var highlightedWeek: Int?
+    @Published var currentWeekNumber: Int = 0  // For Horizons mode display
 
     private var activationTask: Task<Void, Never>?
 

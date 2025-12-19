@@ -21,8 +21,14 @@ struct GridView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var weeks: [Week]
     @Query private var phases: [LifePhase]
-    @Query(filter: #Predicate<Milestone> { !$0.isCompleted }, sort: \Milestone.targetWeekNumber)
-    private var milestones: [Milestone]
+    // Query ALL milestones for grid rendering (including overdue and completed)
+    @Query(sort: \Milestone.targetWeekNumber)
+    private var allMilestones: [Milestone]
+
+    // Filter to just non-completed for context bar display
+    private var milestones: [Milestone] {
+        allMilestones.filter { !$0.isCompleted }
+    }
 
     @State private var animationStartTime: Date?
     @State private var hasRevealCompleted: Bool = false
@@ -39,6 +45,19 @@ struct GridView: View {
     // OPTIMIZATION: Pre-computed grid colors array for instant mode switching
     // Index = weekNumber - 1, stores resolved Color for each week
     @State private var gridColorsCache: [Color] = []
+
+    // OPTIMIZATION: Cache milestone week numbers and colors for O(1) lookup during grid render
+    @State private var milestoneWeeksCache: Set<Int> = []
+    @State private var milestoneColorsCache: [Int: Color] = [:]
+    @State private var milestoneStatusCache: [Int: MilestoneGridStatus] = [:]
+    @State private var milestoneCountCache: [Int: Int] = [:]  // For same-week count badges
+
+    // Status for grid rendering
+    enum MilestoneGridStatus {
+        case upcoming
+        case overdue
+        case completed
+    }
 
     // View mode state (Chapters/Quality/Focus)
     @State private var currentViewMode: ViewMode = .focus
@@ -60,11 +79,17 @@ struct GridView: View {
 
     // Milestone management (Horizons view)
     @State private var showMilestoneBuilder: Bool = false
+    @State private var showMilestoneList: Bool = false  // PRD: Context bar tap → List sheet
     @State private var selectedMilestone: Milestone?
     @State private var milestoneToEdit: Milestone?
+    @State private var milestoneBuilderPreselectedWeek: Int?
 
     // Mode label flash
     @State private var showModeLabel: Bool = false
+
+    // Long press tracking for loupe activation (Quality mode)
+    @State private var longPressStartTime: Date?
+    @State private var longPressLocation: CGPoint?
 
     // First-time swipe hint
     @State private var showSwipeHint: Bool = false
@@ -129,6 +154,55 @@ struct GridView: View {
         }
 
         phaseColorsCache = cache
+    }
+
+    // Rebuild milestone weeks cache for O(1) lookup during grid render
+    // PRD: Include overdue (red), completed (checkmark), and same-week count badges
+    private func rebuildMilestoneWeeksCache() {
+        let currentWeek = user.currentWeekNumber
+
+        var weeks: Set<Int> = []
+        var colors: [Int: Color] = [:]
+        var statuses: [Int: MilestoneGridStatus] = [:]
+        var counts: [Int: Int] = [:]
+
+        for milestone in allMilestones {
+            let week = milestone.targetWeekNumber
+            weeks.insert(week)
+
+            // Count milestones per week (for same-week badge)
+            counts[week, default: 0] += 1
+
+            // Determine status
+            let status: MilestoneGridStatus
+            if milestone.isCompleted {
+                status = .completed
+            } else if week < currentWeek {
+                status = .overdue
+            } else {
+                status = .upcoming
+            }
+
+            // Only set status/color if not already set (prioritize first milestone on same week)
+            if statuses[week] == nil {
+                statuses[week] = status
+
+                // Color: red for overdue, faded for completed, category color for upcoming
+                switch status {
+                case .overdue:
+                    colors[week] = .red.opacity(0.8)
+                case .completed:
+                    colors[week] = Color.textSecondary.opacity(0.5)
+                case .upcoming:
+                    colors[week] = Color.fromHex(milestone.displayColorHex)
+                }
+            }
+        }
+
+        milestoneWeeksCache = weeks
+        milestoneColorsCache = colors
+        milestoneStatusCache = statuses
+        milestoneCountCache = counts
     }
 
     // OPTIMIZATION: Pre-compute all grid colors for the current view mode
@@ -331,6 +405,7 @@ struct GridView: View {
             // Initial cache build
             rebuildRatedWeeksCache()
             rebuildPhaseColorsCache()
+            rebuildMilestoneWeeksCache()
             // Sync view mode with user settings
             currentViewMode = user.currentViewMode
             // Build grid colors cache
@@ -360,6 +435,14 @@ struct GridView: View {
             rebuildGridColorsCache()
             updateAuraColor()
         }
+        .onChange(of: allMilestones.count) { _, _ in
+            // Rebuild milestone cache when milestones added/deleted
+            rebuildMilestoneWeeksCache()
+        }
+        .onChange(of: allMilestones.map { "\($0.targetWeekNumber)-\($0.isCompleted)-\($0.categoryRaw ?? "")" }) { _, _ in
+            // Rebuild cache when any milestone is edited
+            rebuildMilestoneWeeksCache()
+        }
         .sheet(item: $selectedWeekForDetail) { weekId in
             let weekNumberToCheck = weekId.value
 
@@ -379,8 +462,11 @@ struct GridView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     if ratedWeeksCache[weekNumberToCheck] != nil {
                         triggerBloomAnimation(for: weekNumberToCheck)
+                    }
 
-                        // Notify walkthrough that a week was marked
+                    // Advance walkthrough when sheet dismisses (only if on markWeek step)
+                    // Must check step here because it could have changed during sheet display
+                    if walkthrough.currentStep == .markWeek {
                         walkthrough.handleWeekMarked()
                     }
                 }
@@ -409,14 +495,24 @@ struct GridView: View {
         .sheet(isPresented: $showMilestoneBuilder) {
             MilestoneBuilderView(
                 user: user,
-                mode: milestoneToEdit.map { .edit($0) } ?? .add,
-                onSave: { _ in },
+                mode: milestoneToEdit.map { .edit($0) } ?? .add(preselectedWeek: milestoneBuilderPreselectedWeek),
+                onSave: { _ in
+                    milestoneBuilderPreselectedWeek = nil
+                },
                 onDelete: {
                     if let milestone = milestoneToEdit {
                         modelContext.delete(milestone)
                     }
+                    milestoneBuilderPreselectedWeek = nil
                 }
             )
+        }
+        .onChange(of: showMilestoneBuilder) { _, isShowing in
+            if !isShowing {
+                // Reset preselected week when sheet closes
+                milestoneBuilderPreselectedWeek = nil
+                milestoneToEdit = nil
+            }
         }
         .sheet(item: $selectedMilestone) { milestone in
             MilestoneDetailSheet(
@@ -435,6 +531,13 @@ struct GridView: View {
                     selectedMilestone = nil
                 }
             )
+        }
+        .sheet(isPresented: $showMilestoneList) {
+            // PRD: Context bar → List sheet with .medium/.large detents
+            MilestoneListView(user: user) { milestone in
+                // Row tap → dismiss list, open detail (with delay built into MilestoneListView)
+                selectedMilestone = milestone
+            }
         }
         .overlay {
             if showPhasePrompt {
@@ -549,25 +652,7 @@ struct GridView: View {
                 walkthrough.gridFrame = frame
             }
             .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 50)
-                    .onEnded { value in
-                        // CRAFT_SPEC: Swipe left/right to change view modes
-                        let horizontalAmount = value.translation.width
-                        let verticalAmount = value.translation.height
-
-                        // Only trigger if horizontal swipe is dominant
-                        guard abs(horizontalAmount) > abs(verticalAmount) else { return }
-
-                        if horizontalAmount < -50 {
-                            // Swipe left → next mode
-                            swipeToNextMode()
-                        } else if horizontalAmount > 50 {
-                            // Swipe right → previous mode
-                            swipeToPreviousMode()
-                        }
-                    }
-            )
+            .gesture(swipeGesture)
 
             // Right age labels
             VStack(alignment: .leading, spacing: 0) {
@@ -600,6 +685,12 @@ struct GridView: View {
         let colors = gridColorsCache
         let total = totalWeeks
         let perRow = weeksPerRow
+        let milestoneWeeks = milestoneWeeksCache
+        let milestoneColors = milestoneColorsCache
+        let milestoneStatuses = milestoneStatusCache
+        let milestoneCounts = milestoneCountCache
+        let currentWeek = currentWeekNumber
+        let viewMode = currentViewMode
 
         return ZStack(alignment: .topLeading) {
             // OPTIMIZATION: Canvas reads from pre-computed color array
@@ -614,9 +705,43 @@ struct GridView: View {
                     let x = CGFloat(col) * (cellSize + spacing)
                     let y = CGFloat(row) * (cellSize + spacing)
                     let rect = CGRect(x: x, y: y, width: cellSize, height: cellSize)
-                    let circle = Path(ellipseIn: rect)
 
-                    context.fill(circle, with: .color(colors[index]))
+                    // Draw milestone markers in Horizons view
+                    if viewMode == .horizons && milestoneWeeks.contains(weekNumber) {
+                        let status = milestoneStatuses[weekNumber]
+                        let markerColor = milestoneColors[weekNumber] ?? Color.textPrimary
+
+                        switch status {
+                        case .completed:
+                            // PRD: Completed = checkmark, faded
+                            // Draw a simple checkmark shape
+                            let checkPath = checkmarkPath(in: rect)
+                            context.fill(checkPath, with: .color(markerColor))
+
+                        case .overdue:
+                            // PRD: Overdue = hexagon, red tint (in past zone)
+                            let hexPath = hexagonPath(in: rect)
+                            context.fill(hexPath, with: .color(markerColor))
+
+                        case .upcoming, .none:
+                            // PRD: Upcoming = hexagon with category color
+                            let hexPath = hexagonPath(in: rect)
+                            context.fill(hexPath, with: .color(markerColor))
+                        }
+
+                        // PRD: Same-week count badge (if multiple milestones)
+                        if let count = milestoneCounts[weekNumber], count > 1 {
+                            let badgeSize: CGFloat = cellSize * 0.5
+                            let badgeX = x + cellSize - badgeSize / 2
+                            let badgeY = y - badgeSize / 2
+                            let badgeRect = CGRect(x: badgeX, y: badgeY, width: badgeSize, height: badgeSize)
+                            let badgeCircle = Path(ellipseIn: badgeRect)
+                            context.fill(badgeCircle, with: .color(.red))
+                        }
+                    } else {
+                        let circle = Path(ellipseIn: rect)
+                        context.fill(circle, with: .color(colors[index]))
+                    }
                 }
             }
             .frame(width: gridWidth, height: gridHeight)
@@ -624,6 +749,11 @@ struct GridView: View {
 
             // Current week pulse ring (more visible)
             currentWeekPulseRing(cellSize: cellSize, spacing: spacing)
+
+            // Milestone pulse rings (Horizons view only - subtle pulse on upcoming milestones)
+            if currentViewMode == .horizons {
+                milestonePulseRings(cellSize: cellSize, spacing: spacing)
+            }
 
             // Bloom animation overlay (when a week is confirmed)
             if let bloomWeek = bloomWeekNumber {
@@ -643,15 +773,19 @@ struct GridView: View {
 
             // Tap gesture for current week quick access (Quality mode)
             // Also tap to select week within highlighted phase (Chapters mode)
+            // Also tap on milestone markers in Horizons view
             if currentViewMode == .quality || highlightedPhase != nil {
                 weekTapTarget(cellSize: cellSize, spacing: spacing)
             } else if currentViewMode == .chapters && highlightedPhase == nil {
                 // Only current week tap in Chapters when no phase highlighted
                 currentWeekTapTarget(cellSize: cellSize, spacing: spacing)
+            } else if currentViewMode == .horizons {
+                // Horizons: tap on milestones to view details
+                milestoneTapTarget(cellSize: cellSize, spacing: spacing)
             }
 
-            // Magnification loupe overlay (Quality view long-press)
-            if loupeState.isActive && currentViewMode == .quality {
+            // Magnification loupe overlay (Quality and Horizons view long-press)
+            if loupeState.isActive && (currentViewMode == .quality || currentViewMode == .horizons) {
                 // Dim the grid behind the loupe for clarity
                 Color.bgPrimary.opacity(0.6)
                     .frame(width: gridWidth, height: gridHeight)
@@ -814,6 +948,43 @@ struct GridView: View {
         .allowsHitTesting(false)
     }
 
+    // MARK: - Milestone Pulse Rings (Horizons View)
+    // Subtle pulsing rings around upcoming milestones to provide visual feedback
+
+    private func milestonePulseRings(cellSize: CGFloat, spacing: CGFloat) -> some View {
+        // Only show pulse on first 5 upcoming milestones to avoid visual clutter
+        let upcomingMilestones = allMilestones
+            .filter { !$0.isCompleted && $0.targetWeekNumber > currentWeekNumber }
+            .prefix(5)
+
+        return ZStack {
+            ForEach(Array(upcomingMilestones), id: \.id) { milestone in
+                let weekNumber = milestone.targetWeekNumber
+                let row = (weekNumber - 1) / weeksPerRow
+                let col = (weekNumber - 1) % weeksPerRow
+                let x = CGFloat(col) * (cellSize + spacing) + cellSize / 2
+                let y = CGFloat(row) * (cellSize + spacing) + cellSize / 2
+                let color = Color.fromHex(milestone.displayColorHex)
+
+                // Subtle pulse ring
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                    let elapsed = timeline.date.timeIntervalSinceReferenceDate
+                    // Stagger the animation for each milestone
+                    let offset = Double(weekNumber) * 0.3
+                    let phase = (sin((elapsed + offset) * .pi * 0.5) + 1) / 2
+                    let ringScale = 1.5 + (0.5 * phase)
+                    let ringOpacity = 0.4 - (0.3 * phase)
+
+                    Circle()
+                        .stroke(color.opacity(ringOpacity), lineWidth: 1.5)
+                        .frame(width: cellSize * ringScale, height: cellSize * ringScale)
+                        .position(x: x, y: y)
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
     // MARK: - Current Week Tap Target
 
     private func currentWeekTapTarget(cellSize: CGFloat, spacing: CGFloat) -> some View {
@@ -827,6 +998,9 @@ struct GridView: View {
             .frame(width: tapSize, height: tapSize)
             .contentShape(Rectangle())
             .onTapGesture {
+                // Block during walkthrough
+                guard !walkthrough.isActive else { return }
+
                 HapticService.shared.light()
 
                 // Open week detail
@@ -835,25 +1009,152 @@ struct GridView: View {
             .offset(x: x - (tapSize - cellSize) / 2, y: y - (tapSize - cellSize) / 2)
     }
 
+    // MARK: - Milestone Tap Target (Horizons View)
+    // Tap on milestones to view/edit, tap on future empty weeks to add
+    // Long-press activates loupe for navigating milestones on grid
+
+    private func milestoneTapTarget(cellSize: CGFloat, spacing: CGFloat) -> some View {
+        GeometryReader { _ in
+            Color.clear
+                .contentShape(Rectangle())
+                .gesture(horizonsModeGesture(cellSize: cellSize, spacing: spacing))
+                .onTapGesture { location in
+                    handleMilestoneTap(at: location, cellSize: cellSize, spacing: spacing)
+                }
+        }
+    }
+
+    // Horizons mode gesture: long-press activates loupe for finding milestones
+    // Blocked during walkthrough (Horizons is last step, no interaction needed)
+    private func horizonsModeGesture(cellSize: CGFloat, spacing: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+            .onChanged { value in
+                // Block during walkthrough
+                guard !walkthrough.isActive else { return }
+
+                let holdDuration: TimeInterval = 0.3
+
+                if longPressStartTime == nil {
+                    longPressStartTime = Date()
+                    longPressLocation = value.startLocation
+                }
+
+                // Check if held long enough to activate loupe
+                if let startTime = longPressStartTime,
+                   Date().timeIntervalSince(startTime) >= holdDuration {
+                    if !loupeState.isActive {
+                        // Activate loupe
+                        withAnimation(.snappy(duration: 0.15, extraBounce: 0.1)) {
+                            loupeState.isActive = true
+                            loupeState.position = longPressLocation ?? value.startLocation
+                        }
+                        HapticService.shared.light()
+                    }
+                    // Update loupe position - show milestone info if on a milestone week
+                    updateMilestoneLoupe(
+                        at: value.location,
+                        cellSize: cellSize,
+                        spacing: spacing
+                    )
+                }
+            }
+            .onEnded { value in
+                // Block during walkthrough
+                guard !walkthrough.isActive else {
+                    longPressStartTime = nil
+                    longPressLocation = nil
+                    return
+                }
+
+                let wasActive = loupeState.isActive
+                longPressStartTime = nil
+                longPressLocation = nil
+
+                if wasActive {
+                    // End loupe and handle action
+                    let col = Int(value.location.x / (cellSize + spacing))
+                    let row = Int(value.location.y / (cellSize + spacing))
+                    let weekNumber = row * weeksPerRow + col + 1
+
+                    withAnimation(.snappy(duration: 0.15)) {
+                        loupeState.isActive = false
+                    }
+
+                    // If on a milestone, open detail; if future empty week, open builder
+                    if let milestone = allMilestones.first(where: { $0.targetWeekNumber == weekNumber }) {
+                        HapticService.shared.medium()
+                        selectedMilestone = milestone
+                    } else if weekNumber > currentWeekNumber && weekNumber <= totalWeeks {
+                        HapticService.shared.medium()
+                        milestoneBuilderPreselectedWeek = weekNumber
+                        showMilestoneBuilder = true
+                    }
+                }
+            }
+    }
+
+    // Update loupe for Horizons view - shows week number and milestone info
+    private func updateMilestoneLoupe(at location: CGPoint, cellSize: CGFloat, spacing: CGFloat) {
+        let col = Int(location.x / (cellSize + spacing))
+        let row = Int(location.y / (cellSize + spacing))
+        let weekNumber = row * weeksPerRow + col + 1
+
+        // Clamp to valid range
+        let clampedWeek = max(1, min(weekNumber, totalWeeks))
+
+        loupeState.position = location
+        loupeState.currentWeekNumber = clampedWeek
+
+        // Add haptic tick when crossing milestone weeks
+        if milestoneWeeksCache.contains(clampedWeek) && loupeState.currentWeekNumber != clampedWeek {
+            HapticService.shared.selection()
+        }
+    }
+
+    private func handleMilestoneTap(at location: CGPoint, cellSize: CGFloat, spacing: CGFloat) {
+        // Block during walkthrough
+        guard !walkthrough.isActive else { return }
+
+        // Calculate which week was tapped
+        let col = Int(location.x / (cellSize + spacing))
+        let row = Int(location.y / (cellSize + spacing))
+        let weekNumber = row * weeksPerRow + col + 1
+
+        // Check if this week has a milestone (include all milestones, not just upcoming)
+        if let milestone = allMilestones.first(where: { $0.targetWeekNumber == weekNumber }) {
+            // Open milestone detail
+            HapticService.shared.light()
+            selectedMilestone = milestone
+        } else if weekNumber > currentWeekNumber {
+            // Future week without milestone - open builder with this week pre-selected
+            HapticService.shared.light()
+            milestoneBuilderPreselectedWeek = weekNumber
+            showMilestoneBuilder = true
+        }
+    }
+
     // MARK: - Week Tap Target (Full Grid)
     // For Quality mode: direct tap on any lived week, long-press for loupe
     // For Chapters mode with highlighted phase: tap to select week within phase
+
+    // Computed property to determine if loupe gesture should be active
+    // This helps SwiftUI properly observe changes
+    private var shouldEnableLoupeGesture: Bool {
+        currentViewMode == .quality && walkthrough.allowsLongPress
+    }
 
     private func weekTapTarget(cellSize: CGFloat, spacing: CGFloat) -> some View {
         GeometryReader { _ in
             Color.clear
                 .contentShape(Rectangle())
+                // Only attach loupe gesture when appropriate
+                // Using id() forces view recreation when shouldEnableLoupeGesture changes
                 .gesture(
-                    currentViewMode == .quality
+                    shouldEnableLoupeGesture
                         ? qualityModeGesture(cellSize: cellSize, spacing: spacing)
                         : nil
                 )
-                .simultaneousGesture(
-                    TapGesture()
-                        .onEnded { _ in
-                            // This won't work for location - need to use the drag gesture for positioning
-                        }
-                )
+                .id(shouldEnableLoupeGesture)  // Force view recreation
                 .onTapGesture { location in
                     if !loupeState.isActive {
                         handleWeekTap(at: location, cellSize: cellSize, spacing: spacing)
@@ -862,49 +1163,96 @@ struct GridView: View {
         }
     }
 
-    // Quality mode gesture: long-press activates loupe, drag moves it
+    // Swipe gesture for changing view modes
+    private var swipeGesture: some Gesture {
+        DragGesture(minimumDistance: 50)
+            .onEnded { value in
+                // Block swipes during walkthrough unless allowed
+                guard walkthrough.allowsSwipe else { return }
+
+                // CRAFT_SPEC: Swipe left/right to change view modes
+                let horizontalAmount = value.translation.width
+                let verticalAmount = value.translation.height
+
+                // Only trigger if horizontal swipe is dominant
+                guard abs(horizontalAmount) > abs(verticalAmount) else { return }
+
+                if horizontalAmount < -50 {
+                    // Swipe left → next mode
+                    swipeToNextMode()
+                } else if horizontalAmount > 50 {
+                    // Swipe right → previous mode (blocked during walkthrough)
+                    if !walkthrough.isActive {
+                        swipeToPreviousMode()
+                    }
+                }
+            }
+    }
+
+    // Quality mode gesture: long-press activates loupe at press location, drag moves it
+    // Uses DragGesture with minimumDistance:0 to get location immediately,
+    // then activates loupe after 0.3s hold time
+    // Note: This gesture is only attached when shouldEnableLoupeGesture is true
     private func qualityModeGesture(cellSize: CGFloat, spacing: CGFloat) -> some Gesture {
-        LongPressGesture(minimumDuration: 0.3)
-            .sequenced(before: DragGesture(minimumDistance: 0))
+        DragGesture(minimumDistance: 0, coordinateSpace: .local)
             .onChanged { value in
-                switch value {
-                case .first(true):
-                    // Long press recognized but drag hasn't started
-                    break
-                case .second(true, let drag):
-                    if let dragValue = drag {
-                        if !loupeState.isActive {
-                            // Activate loupe
-                            withAnimation(.snappy(duration: 0.15, extraBounce: 0.1)) {
-                                loupeState.isActive = true
-                                loupeState.position = dragValue.location
-                            }
-                            HapticService.shared.light()
+                let holdDuration: TimeInterval = 0.3
+
+                if longPressStartTime == nil {
+                    // First touch - record start time and location
+                    longPressStartTime = Date()
+                    longPressLocation = value.startLocation
+                }
+
+                // Check if we've held long enough to activate loupe
+                if let startTime = longPressStartTime,
+                   Date().timeIntervalSince(startTime) >= holdDuration {
+                    if !loupeState.isActive {
+                        // Activate loupe at the original press location
+                        withAnimation(.snappy(duration: 0.15, extraBounce: 0.1)) {
+                            loupeState.isActive = true
+                            loupeState.position = longPressLocation ?? value.startLocation
                         }
-                        // Update loupe position
+                        HapticService.shared.light()
+                        // Immediately update to show correct week
                         loupeState.updatePosition(
-                            dragValue.location,
+                            longPressLocation ?? value.startLocation,
                             cellSize: cellSize,
                             spacing: spacing,
                             weeksPerRow: weeksPerRow,
                             weeksLived: weeksLived
                         )
                     }
-                default:
-                    break
+                    // Update loupe position as user drags
+                    loupeState.updatePosition(
+                        value.location,
+                        cellSize: cellSize,
+                        spacing: spacing,
+                        weeksPerRow: weeksPerRow,
+                        weeksLived: weeksLived
+                    )
                 }
             }
-            .onEnded { value in
-                if case .second(true, _) = value {
+            .onEnded { _ in
+                // Reset long press tracking
+                let wasActive = loupeState.isActive
+                longPressStartTime = nil
+                longPressLocation = nil
+
+                if wasActive {
                     // End loupe and select week
                     if let selectedWeek = loupeState.endLongPress() {
                         selectedWeekForDetail = WeekIdentifier(value: selectedWeek)
+                        // Note: Walkthrough advances in sheet's onDisappear after week is actually rated
                     }
                 }
             }
     }
 
     private func handleWeekTap(at location: CGPoint, cellSize: CGFloat, spacing: CGFloat) {
+        // Block taps during walkthrough unless on markWeek step
+        guard walkthrough.allowsGridTap else { return }
+
         // Calculate which week was tapped
         let col = Int(location.x / (cellSize + spacing))
         let row = Int(location.y / (cellSize + spacing))
@@ -938,6 +1286,7 @@ struct GridView: View {
             // Quality mode: direct tap opens week detail
             HapticService.shared.light()
             selectedWeekForDetail = WeekIdentifier(value: weekNumber)
+            // Note: Walkthrough advances in sheet's onDisappear after week is actually rated
         }
     }
 
@@ -958,6 +1307,9 @@ struct GridView: View {
                 phases: phases,
                 highlightedPhase: highlightedPhase
             ) {
+                // Block during walkthrough unless on addPhase step
+                guard walkthrough.allowsAddButton else { return }
+
                 // Tap action: edit current phase or add new
                 if let phase = highlightedPhase ?? currentPhaseForUser {
                     phaseToEdit = phase
@@ -973,16 +1325,20 @@ struct GridView: View {
 
         case .horizons:
             // Milestone context bar - shows next milestone or add prompt
+            // PRD: Tap main area → List sheet, tap [+] → Builder
+            // During walkthrough, block all interactions (Horizons is last step)
             MilestoneContextBar(
                 milestone: nextMilestone,
+                totalCount: upcomingMilestoneCount,
                 currentWeek: user.currentWeekNumber,
                 user: user,
-                onTap: {
-                    if let next = nextMilestone {
-                        selectedMilestone = next
-                    }
+                onTap: walkthrough.isActive ? nil : {
+                    // PRD: Context bar tap → List sheet (not Detail)
+                    HapticService.shared.light()
+                    showMilestoneList = true
                 },
-                onAddTap: {
+                onAddTap: walkthrough.isActive ? nil : {
+                    HapticService.shared.light()
                     milestoneToEdit = nil
                     showMilestoneBuilder = true
                 }
@@ -994,6 +1350,11 @@ struct GridView: View {
     // Next upcoming milestone
     private var nextMilestone: Milestone? {
         milestones.first { $0.targetWeekNumber > user.currentWeekNumber }
+    }
+
+    // Count of upcoming milestones (for context bar "X horizons" display)
+    private var upcomingMilestoneCount: Int {
+        milestones.filter { $0.targetWeekNumber >= user.currentWeekNumber }.count
     }
 
     // Current phase for the user's current week
@@ -1012,8 +1373,12 @@ struct GridView: View {
 
     private var markCurrentWeekButton: some View {
         Button {
+            // Block during walkthrough unless on markWeek step
+            guard walkthrough.allowsGridTap else { return }
+
             HapticService.shared.light()
             selectedWeekForDetail = WeekIdentifier(value: currentWeekNumber)
+            // Note: Walkthrough advances in sheet's onDisappear after week is actually rated
         } label: {
             HStack(spacing: 8) {
                 if isCurrentWeekMarked {
@@ -1216,7 +1581,23 @@ struct GridView: View {
 
     private func swipeToNextMode() {
         HapticService.shared.light()
-        currentViewMode = currentViewMode.next
+
+        // During walkthrough, override normal navigation to follow tutorial order
+        if walkthrough.isActive {
+            switch walkthrough.currentStep {
+            case .swipeToChapters:
+                currentViewMode = .chapters
+            case .swipeToQuality:
+                currentViewMode = .quality
+            case .swipeToHorizons:
+                currentViewMode = .horizons
+            default:
+                currentViewMode = currentViewMode.next
+            }
+        } else {
+            currentViewMode = currentViewMode.next
+        }
+
         user.currentViewMode = currentViewMode
         rebuildGridColorsCache()
         flashModeLabel()
@@ -1366,6 +1747,55 @@ struct GridView: View {
     // - Chapters: PhaseContextBar
     // - Quality: "Edit This Week" button (header shows countdown)
     // - Focus: Ghost number
+
+    // MARK: - Hexagon Path Helper
+
+    /// Creates a hexagon path that fits within the given rect
+    private func hexagonPath(in rect: CGRect) -> Path {
+        var path = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+
+        for i in 0..<6 {
+            // Start from top vertex (rotate by -90 degrees / -π/2)
+            let angle = CGFloat(i) * .pi / 3 - .pi / 2
+            let point = CGPoint(
+                x: center.x + radius * cos(angle),
+                y: center.y + radius * sin(angle)
+            )
+            if i == 0 {
+                path.move(to: point)
+            } else {
+                path.addLine(to: point)
+            }
+        }
+        path.closeSubpath()
+        return path
+    }
+
+    // MARK: - Checkmark Path Helper
+
+    /// Creates a checkmark path that fits within the given rect (for completed milestones)
+    private func checkmarkPath(in rect: CGRect) -> Path {
+        var path = Path()
+        let inset = rect.width * 0.15
+        let insetRect = rect.insetBy(dx: inset, dy: inset)
+
+        // Simple checkmark: starts at left-middle, goes down to bottom-middle, then up to top-right
+        let startPoint = CGPoint(x: insetRect.minX, y: insetRect.midY)
+        let middlePoint = CGPoint(x: insetRect.minX + insetRect.width * 0.35, y: insetRect.maxY - inset)
+        let endPoint = CGPoint(x: insetRect.maxX, y: insetRect.minY + inset)
+
+        // Draw thick checkmark by creating a path with width
+        let lineWidth = rect.width * 0.2
+
+        path.move(to: startPoint)
+        path.addLine(to: middlePoint)
+        path.addLine(to: endPoint)
+
+        // Create stroked version with round caps
+        return path.strokedPath(StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
+    }
 }
 
 // MARK: - Scale Button Style

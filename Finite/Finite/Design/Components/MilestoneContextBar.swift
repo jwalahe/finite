@@ -10,9 +10,10 @@ import SwiftUI
 
 struct MilestoneContextBar: View {
     let milestone: Milestone?
+    let totalCount: Int  // Total upcoming milestones count
     let currentWeek: Int
     let user: User
-    let onTap: (() -> Void)?
+    let onTap: (() -> Void)?  // Tap main area → opens List sheet
     let onAddTap: (() -> Void)?
 
     var body: some View {
@@ -37,22 +38,40 @@ struct MilestoneContextBar: View {
 
                 // Milestone info
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(milestone.name)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(Color.textPrimary)
-                        .lineLimit(1)
+                    // Name with weeks inline
+                    HStack(spacing: 6) {
+                        Text(milestone.name)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(Color.textPrimary)
+                            .lineLimit(1)
 
-                    HStack(spacing: 8) {
-                        // Age
+                        Text("•")
+                            .foregroundStyle(Color.textTertiary)
+
+                        Text("\(milestone.weeksRemaining(from: currentWeek)) weeks")
+                            .font(.subheadline.weight(.medium).monospacedDigit())
+                            .foregroundStyle(categoryColor(for: milestone))
+                    }
+
+                    // Details row
+                    HStack(spacing: 6) {
                         Text("Age \(milestone.targetAge(birthYear: user.birthYear))")
                             .font(.caption)
                             .foregroundStyle(Color.textSecondary)
 
-                        // Category
                         if let category = milestone.category {
-                            Text("·")
+                            Text("•")
                                 .foregroundStyle(Color.textTertiary)
                             Text(category.displayName)
+                                .font(.caption)
+                                .foregroundStyle(Color.textSecondary)
+                        }
+
+                        // Horizons count (PRD: signals there are more to see)
+                        if totalCount > 1 {
+                            Text("•")
+                                .foregroundStyle(Color.textTertiary)
+                            Text("\(totalCount) horizons")
                                 .font(.caption)
                                 .foregroundStyle(Color.textSecondary)
                         }
@@ -61,67 +80,55 @@ struct MilestoneContextBar: View {
 
                 Spacer()
 
-                // Weeks remaining
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(milestone.weeksRemaining(from: currentWeek))")
-                        .font(.title3.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(Color.textPrimary)
-                    Text("weeks")
-                        .font(.caption2)
-                        .foregroundStyle(Color.textTertiary)
+                // Add button (matching PhaseContextBar style)
+                if onAddTap != nil {
+                    Button(action: { onAddTap?() }) {
+                        Text("Add")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color.textSecondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule().fill(Color.bgTertiary)
+                            )
+                    }
+                    .buttonStyle(.plain)
                 }
-
-                // Add more button
-                Button(action: { onAddTap?() }) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle(Color.textSecondary)
-                }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.bgSecondary)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.bgSecondary.opacity(0.8))
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - Empty State
 
     private var emptyStateRow: some View {
         Button(action: { onAddTap?() }) {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(Color.textSecondary)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.textTertiary)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Set your first horizon")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(Color.textPrimary)
-                    Text("Pin a goal to your future")
-                        .font(.caption)
-                        .foregroundStyle(Color.textSecondary)
-                }
+                Text("Add a horizon for your future")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.textTertiary)
 
                 Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(Color.textTertiary)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.vertical, 12)
             .background(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 10)
                     .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
-                    .foregroundStyle(Color.textTertiary)
+                    .foregroundStyle(Color.textTertiary.opacity(0.5))
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - Helpers
@@ -138,15 +145,30 @@ struct MilestoneContextBar: View {
     let milestone = Milestone(name: "Launch Startup", targetWeekNumber: 1625, category: .work)
 
     return VStack(spacing: 24) {
-        Text("With Milestone")
+        Text("With Milestone (4 total)")
             .font(.caption)
             .foregroundStyle(.secondary)
 
         MilestoneContextBar(
             milestone: milestone,
+            totalCount: 4,
             currentWeek: 1560,
             user: user,
-            onTap: { print("View milestone") },
+            onTap: { print("Open list sheet") },
+            onAddTap: { print("Add milestone") }
+        )
+        .padding(.horizontal, 24)
+
+        Text("Single Milestone")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+        MilestoneContextBar(
+            milestone: milestone,
+            totalCount: 1,
+            currentWeek: 1560,
+            user: user,
+            onTap: { print("Open list sheet") },
             onAddTap: { print("Add milestone") }
         )
         .padding(.horizontal, 24)
@@ -157,6 +179,7 @@ struct MilestoneContextBar: View {
 
         MilestoneContextBar(
             milestone: nil,
+            totalCount: 0,
             currentWeek: 1560,
             user: user,
             onTap: nil,

@@ -20,7 +20,9 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
     case tapSpine = 5           // Tap the spine to see phase details (Chapters view)
     case swipeToQuality = 6     // Swipe to Quality view
     case markWeek = 7           // Long-press to mark a week (Quality view)
-    case complete = 8
+    case swipeToHorizons = 8    // Swipe to Horizons view
+    case explainHorizons = 9    // Explain horizons concept (Horizons view)
+    case complete = 10
 
     var id: Int { rawValue }
 
@@ -34,6 +36,8 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
         case .tapSpine: return "The Timeline"
         case .swipeToQuality: return "Rate Your Weeks"
         case .markWeek: return "Try It Now"
+        case .swipeToHorizons: return "Your Horizons"
+        case .explainHorizons: return "Plan Your Future"
         case .complete: return "You're Ready"
         }
     }
@@ -56,6 +60,10 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
             return "Swipe left once more to rate individual weeks."
         case .markWeek:
             return "Hold any filled week to rate it.\nA magnifier helps you find your spot."
+        case .swipeToHorizons:
+            return "Swipe left to see your future."
+        case .explainHorizons:
+            return "Pin life goals to future weeks.\nSee exactly how many weeks until you get there."
         case .complete:
             return "Take your time. Reflect weekly.\nYour life is finite—make it count."
         }
@@ -63,8 +71,8 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
 
     var requiresUserAction: Bool {
         switch self {
-        case .gridIntro, .currentWeekIntro, .explainChapters, .tapSpine: return false  // Tap overlay
-        case .swipeToChapters, .addPhase, .swipeToQuality, .markWeek: return true  // Grid handles action
+        case .gridIntro, .currentWeekIntro, .explainChapters, .tapSpine, .explainHorizons: return false  // Tap overlay
+        case .swipeToChapters, .addPhase, .swipeToQuality, .markWeek, .swipeToHorizons: return true  // Grid handles action
         case .complete: return false  // Auto-dismiss
         }
     }
@@ -79,7 +87,51 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
         case .tapSpine: return "Tap to continue"
         case .swipeToQuality: return "Swipe left"
         case .markWeek: return "Hold any filled week"
+        case .swipeToHorizons: return "Swipe left"
+        case .explainHorizons: return "Tap to continue"
         case .complete: return nil
+        }
+    }
+
+    // MARK: - Allowed Gestures (for blocking unintended actions)
+
+    /// Whether swipe gestures are allowed at this step
+    var allowsSwipe: Bool {
+        switch self {
+        case .swipeToChapters, .swipeToQuality, .swipeToHorizons:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Whether long-press/loupe gestures are allowed at this step
+    var allowsLongPress: Bool {
+        switch self {
+        case .markWeek:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Whether tapping on grid elements (weeks, milestones) is allowed
+    var allowsGridTap: Bool {
+        switch self {
+        case .markWeek:
+            return true  // Allow tapping weeks to rate
+        default:
+            return false
+        }
+    }
+
+    /// Whether the add button tap is allowed (phases/horizons)
+    var allowsAddButton: Bool {
+        switch self {
+        case .addPhase:
+            return true
+        default:
+            return false
         }
     }
 }
@@ -121,6 +173,32 @@ final class WalkthroughService: ObservableObject {
         return Double(step.rawValue) / Double(WalkthroughStep.allCases.count - 1)
     }
 
+    // MARK: - Gesture Blocking Helpers
+
+    /// Check if swipe gestures should be allowed (false blocks the gesture)
+    var allowsSwipe: Bool {
+        guard isActive, let step = currentStep else { return true }
+        return step.allowsSwipe
+    }
+
+    /// Check if long-press/loupe gestures should be allowed
+    var allowsLongPress: Bool {
+        guard isActive, let step = currentStep else { return true }
+        return step.allowsLongPress
+    }
+
+    /// Check if grid taps (week selection) should be allowed
+    var allowsGridTap: Bool {
+        guard isActive, let step = currentStep else { return true }
+        return step.allowsGridTap
+    }
+
+    /// Check if add button taps should be allowed
+    var allowsAddButton: Bool {
+        guard isActive, let step = currentStep else { return true }
+        return step.allowsAddButton
+    }
+
     // MARK: - Init
 
     private init() {}
@@ -149,13 +227,11 @@ final class WalkthroughService: ObservableObject {
         if nextIndex < WalkthroughStep.allCases.endIndex {
             let nextStep = WalkthroughStep.allCases[nextIndex]
 
-            // Slight delay between steps for breathing room
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                withAnimation(.easeOut(duration: 0.3)) {
-                    self?.currentStep = nextStep
-                }
-                HapticService.shared.light()
+            // Animate step change immediately (no delay to prevent gesture blocking)
+            withAnimation(.easeOut(duration: 0.3)) {
+                currentStep = nextStep
             }
+            HapticService.shared.light()
         } else {
             complete()
         }
@@ -201,6 +277,8 @@ final class WalkthroughService: ObservableObject {
         if currentStep == .swipeToChapters && mode == .chapters {
             advance()
         } else if currentStep == .swipeToQuality && mode == .quality {
+            advance()
+        } else if currentStep == .swipeToHorizons && mode == .horizons {
             advance()
         }
     }

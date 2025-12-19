@@ -50,9 +50,14 @@ struct CoachMark: View {
                 }
             }
             .onChange(of: step) { _, _ in
-                isVisible = false
-                withAnimation(.easeOut(duration: 0.4).delay(0.15)) {
-                    isVisible = true
+                // Cross-fade to new step content
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    isVisible = false
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        isVisible = true
+                    }
                 }
             }
             .contentShape(Rectangle())
@@ -74,7 +79,7 @@ struct CoachMark: View {
             // Center of screen (no grid spotlight)
             return CGPoint(x: screenSize.width / 2, y: screenSize.height / 2)
 
-        case .gridIntro, .currentWeekIntro, .swipeToChapters, .explainChapters, .tapSpine, .swipeToQuality, .markWeek:
+        case .gridIntro, .currentWeekIntro, .swipeToChapters, .explainChapters, .tapSpine, .swipeToQuality, .markWeek, .swipeToHorizons, .explainHorizons:
             // Position below the grid
             let belowGrid = gridFrame.maxY + 80
             let safeY = min(belowGrid, screenSize.height - safeBottom)

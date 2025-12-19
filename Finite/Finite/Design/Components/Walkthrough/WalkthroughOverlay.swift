@@ -62,12 +62,12 @@ struct WalkthroughOverlay: View {
                     }
                 }
 
-                // Minimal progress dots
+                // Minimal progress dots (10 steps: 0-9, excluding complete)
                 if step != .complete {
                     VStack {
                         Spacer()
                         HStack(spacing: 6) {
-                            ForEach(0..<8, id: \.self) { index in
+                            ForEach(0..<10, id: \.self) { index in
                                 Circle()
                                     .fill(index <= step.rawValue ? Color.white : Color.white.opacity(0.3))
                                     .frame(width: 5, height: 5)
@@ -122,6 +122,14 @@ struct WalkthroughOverlay: View {
         case .markWeek:
             // Touches pass through - grid handles long-press
             break
+
+        case .swipeToHorizons:
+            // Touches pass through - grid handles swipe
+            break
+
+        case .explainHorizons:
+            // Explain horizons concept - tap to continue
+            walkthrough.advance()
 
         case .complete:
             walkthrough.skip()

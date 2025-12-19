@@ -83,7 +83,7 @@ struct SettingsView: View {
                 eraseAllData()
             }
         } message: {
-            Text("This will delete all your life data including phases and marked weeks. This cannot be undone.")
+            Text("This will delete all your life data including phases, marked weeks, and horizons. This cannot be undone.")
         }
     }
 
@@ -211,6 +211,12 @@ struct SettingsView: View {
         let phaseDescriptor = FetchDescriptor<LifePhase>()
         if let phases = try? modelContext.fetch(phaseDescriptor) {
             phases.forEach { modelContext.delete($0) }
+        }
+
+        // Delete all milestones
+        let milestoneDescriptor = FetchDescriptor<Milestone>()
+        if let milestones = try? modelContext.fetch(milestoneDescriptor) {
+            milestones.forEach { modelContext.delete($0) }
         }
 
         // Reset user settings to defaults (keep birth date)

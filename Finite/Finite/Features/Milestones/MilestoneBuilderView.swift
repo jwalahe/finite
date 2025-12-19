@@ -19,7 +19,7 @@ struct MilestoneBuilderView: View {
     let onDelete: (() -> Void)?
 
     enum Mode {
-        case add
+        case add(preselectedWeek: Int? = nil)
         case edit(Milestone)
     }
 
@@ -40,9 +40,9 @@ struct MilestoneBuilderView: View {
 
         // Initialize state based on mode
         switch mode {
-        case .add:
-            // Default to 1 year from now
-            _targetWeekNumber = State(initialValue: user.currentWeekNumber + 52)
+        case .add(let preselectedWeek):
+            // Use preselected week or default to 1 year from now
+            _targetWeekNumber = State(initialValue: preselectedWeek ?? (user.currentWeekNumber + 52))
         case .edit(let milestone):
             _name = State(initialValue: milestone.name)
             _targetWeekNumber = State(initialValue: milestone.targetWeekNumber)
@@ -55,6 +55,13 @@ struct MilestoneBuilderView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
+                    // Mini grid preview (PRD: shows where milestone will land)
+                    MilestoneGridPreview(
+                        user: user,
+                        targetWeekNumber: targetWeekNumber,
+                        categoryColor: category.map { Color.fromHex($0.colorHex) }
+                    )
+
                     // Name input
                     nameSection
 
@@ -238,13 +245,13 @@ struct MilestoneBuilderView: View {
             modelContext.insert(milestone)
             onSave?(milestone)
 
-        case .edit(let milestone):
-            milestone.name = trimmedName
-            milestone.targetWeekNumber = targetWeekNumber
-            milestone.category = category
-            milestone.notes = notes.isEmpty ? nil : notes
-            milestone.updatedAt = Date()
-            onSave?(milestone)
+        case .edit(let existingMilestone):
+            existingMilestone.name = trimmedName
+            existingMilestone.targetWeekNumber = targetWeekNumber
+            existingMilestone.category = category
+            existingMilestone.notes = notes.isEmpty ? nil : notes
+            existingMilestone.updatedAt = Date()
+            onSave?(existingMilestone)
         }
 
         HapticService.shared.success()
@@ -327,10 +334,26 @@ struct MilestoneWeekPicker: View {
 struct MilestoneCategoryPicker: View {
     @Binding var selection: WeekCategory?
 
+    // Split categories into 2 rows of 3
+    private var topRowCategories: [WeekCategory] {
+        Array(WeekCategory.allCases.prefix(3))
+    }
+
+    private var bottomRowCategories: [WeekCategory] {
+        Array(WeekCategory.allCases.suffix(3))
+    }
+
     var body: some View {
-        HStack(spacing: 12) {
-            ForEach(WeekCategory.allCases, id: \.self) { category in
-                categoryButton(category)
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                ForEach(topRowCategories, id: \.self) { category in
+                    categoryButton(category)
+                }
+            }
+            HStack(spacing: 8) {
+                ForEach(bottomRowCategories, id: \.self) { category in
+                    categoryButton(category)
+                }
             }
         }
     }
@@ -346,14 +369,16 @@ struct MilestoneCategoryPicker: View {
             }
             HapticService.shared.selection()
         } label: {
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 Image(systemName: category.iconName)
-                    .font(.system(size: 20))
+                    .font(.system(size: 18))
                 Text(category.displayName)
                     .font(.caption2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
+            .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 8)
                     .fill(selection == category ? Color.fromHex(category.colorHex).opacity(0.2) : Color.bgSecondary)
@@ -371,24 +396,107 @@ struct MilestoneCategoryPicker: View {
 // MARK: - Preview
 
 #Preview("Add Mode") {
-    let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: User.self, Milestone.self, configurations: config)
     let user = User(birthDate: Calendar.current.date(byAdding: .year, value: -30, to: Date())!)
-    container.mainContext.insert(user)
-
-    return MilestoneBuilderView(user: user, mode: .add)
-        .modelContainer(container)
+    return MilestoneBuilderView(user: user, mode: .add())
 }
 
 #Preview("Edit Mode") {
-    let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: User.self, Milestone.self, configurations: config)
     let user = User(birthDate: Calendar.current.date(byAdding: .year, value: -30, to: Date())!)
     let milestone = Milestone(name: "Launch Startup", targetWeekNumber: 1625, category: .work)
     milestone.notes = "MVP ready, first paying customer"
-    container.mainContext.insert(user)
-    container.mainContext.insert(milestone)
-
     return MilestoneBuilderView(user: user, mode: .edit(milestone))
-        .modelContainer(container)
+}
+
+// MARK: - Grid Preview Component
+
+/// Mini grid showing current week, lived weeks, and target milestone position
+/// PRD: Provides spatial context for where the milestone lands in your life
+struct MilestoneGridPreview: View {
+    let user: User
+    let targetWeekNumber: Int
+    let categoryColor: Color?
+
+    private let weeksPerRow: Int = 52
+    private let cellSize: CGFloat = 4
+    private let spacing: CGFloat = 1
+    private let previewHeight: CGFloat = 60
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("TIMELINE PREVIEW")
+                .font(.caption)
+                .foregroundStyle(Color.textSecondary)
+
+            Canvas { context, size in
+                let totalWeeks = user.totalWeeks
+                let currentWeek = user.currentWeekNumber
+
+                // Calculate how many rows we can show
+                let rowHeight = cellSize + spacing
+                let visibleRows = Int(size.height / rowHeight)
+
+                // Center the preview around the target week
+                let targetRow = (targetWeekNumber - 1) / weeksPerRow
+                let startRow = max(0, targetRow - visibleRows / 2)
+                let endRow = min(totalWeeks / weeksPerRow, startRow + visibleRows)
+
+                for row in startRow..<endRow {
+                    for col in 0..<weeksPerRow {
+                        let weekNumber = row * weeksPerRow + col + 1
+                        guard weekNumber <= totalWeeks else { continue }
+
+                        let x = CGFloat(col) * (cellSize + spacing)
+                        let y = CGFloat(row - startRow) * rowHeight
+                        let rect = CGRect(x: x, y: y, width: cellSize, height: cellSize)
+
+                        if weekNumber == targetWeekNumber {
+                            // Target week - hexagon with category color
+                            let hexPath = hexagonPath(in: rect)
+                            let color = categoryColor ?? Color.textSecondary
+                            context.fill(hexPath, with: .color(color))
+                        } else if weekNumber == currentWeek {
+                            // Current week - bright marker
+                            let circle = Path(ellipseIn: rect)
+                            context.fill(circle, with: .color(Color.textPrimary))
+                        } else if weekNumber < currentWeek {
+                            // Past weeks - dimmer
+                            let circle = Path(ellipseIn: rect)
+                            context.fill(circle, with: .color(Color.textTertiary.opacity(0.3)))
+                        } else {
+                            // Future weeks
+                            let circle = Path(ellipseIn: rect)
+                            context.fill(circle, with: .color(Color.textTertiary.opacity(0.15)))
+                        }
+                    }
+                }
+            }
+            .frame(height: previewHeight)
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .padding(12)
+        .background(Color.bgSecondary)
+        .cornerRadius(12)
+    }
+
+    private func hexagonPath(in rect: CGRect) -> Path {
+        var path = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+
+        for i in 0..<6 {
+            let angle = CGFloat(i) * .pi / 3 - .pi / 2
+            let point = CGPoint(
+                x: center.x + radius * cos(angle),
+                y: center.y + radius * sin(angle)
+            )
+            if i == 0 {
+                path.move(to: point)
+            } else {
+                path.addLine(to: point)
+            }
+        }
+        path.closeSubpath()
+        return path
+    }
 }
