@@ -21,6 +21,8 @@ struct GridView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var weeks: [Week]
     @Query private var phases: [LifePhase]
+    @Query(filter: #Predicate<Milestone> { !$0.isCompleted }, sort: \Milestone.targetWeekNumber)
+    private var milestones: [Milestone]
 
     @State private var animationStartTime: Date?
     @State private var hasRevealCompleted: Bool = false
@@ -55,6 +57,11 @@ struct GridView: View {
 
     // Phase editing (from TimeSpine tap or PhaseContextBar tap)
     @State private var phaseToEdit: LifePhase?
+
+    // Milestone management (Horizons view)
+    @State private var showMilestoneBuilder: Bool = false
+    @State private var selectedMilestone: Milestone?
+    @State private var milestoneToEdit: Milestone?
 
     // Mode label flash
     @State private var showModeLabel: Bool = false
@@ -398,6 +405,36 @@ struct GridView: View {
         }
         .sheet(item: $phaseToEdit) { phase in
             PhaseEditView(user: user, phase: phase)
+        }
+        .sheet(isPresented: $showMilestoneBuilder) {
+            MilestoneBuilderView(
+                user: user,
+                mode: milestoneToEdit.map { .edit($0) } ?? .add,
+                onSave: { _ in },
+                onDelete: {
+                    if let milestone = milestoneToEdit {
+                        modelContext.delete(milestone)
+                    }
+                }
+            )
+        }
+        .sheet(item: $selectedMilestone) { milestone in
+            MilestoneDetailSheet(
+                milestone: milestone,
+                user: user,
+                onEdit: {
+                    selectedMilestone = nil
+                    milestoneToEdit = milestone
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showMilestoneBuilder = true
+                    }
+                },
+                onComplete: {
+                    milestone.complete(atWeek: user.currentWeekNumber)
+                    HapticService.shared.success()
+                    selectedMilestone = nil
+                }
+            )
         }
         .overlay {
             if showPhasePrompt {
@@ -935,20 +972,28 @@ struct GridView: View {
             markCurrentWeekButton
 
         case .horizons:
-            // Milestone context bar - placeholder until MilestoneContextBar is created
-            Text("Set your first horizon")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .frame(maxWidth: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
-                        .foregroundStyle(Color.textTertiary)
-                )
-                .padding(.horizontal, 24)
+            // Milestone context bar - shows next milestone or add prompt
+            MilestoneContextBar(
+                milestone: nextMilestone,
+                currentWeek: user.currentWeekNumber,
+                user: user,
+                onTap: {
+                    if let next = nextMilestone {
+                        selectedMilestone = next
+                    }
+                },
+                onAddTap: {
+                    milestoneToEdit = nil
+                    showMilestoneBuilder = true
+                }
+            )
+            .padding(.horizontal, 24)
         }
+    }
+
+    // Next upcoming milestone
+    private var nextMilestone: Milestone? {
+        milestones.first { $0.targetWeekNumber > user.currentWeekNumber }
     }
 
     // Current phase for the user's current week

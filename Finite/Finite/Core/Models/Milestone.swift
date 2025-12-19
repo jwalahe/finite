@@ -10,7 +10,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class Milestone {
+final class Milestone: Identifiable {
     var id: UUID
     var name: String
     var targetWeekNumber: Int  // Must be > user.currentWeekNumber
