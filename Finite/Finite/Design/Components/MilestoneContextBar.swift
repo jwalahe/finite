@@ -16,6 +16,12 @@ struct MilestoneContextBar: View {
     let onTap: (() -> Void)?  // Tap main area → opens List sheet
     let onAddTap: (() -> Void)?
 
+    // BUG-003.5: Context Bar as Field Guide
+    // Shows "Ahead: X" and "Behind: Y" based on visible scroll position
+    // Tells you about where you ARE, not where to go
+    var milestonesAhead: Int = 0
+    var milestonesBehind: Int = 0
+
     var body: some View {
         if let milestone = milestone {
             // Show next milestone info
@@ -53,8 +59,24 @@ struct MilestoneContextBar: View {
                             .foregroundStyle(categoryColor(for: milestone))
                     }
 
-                    // Details row
+                    // Details row - BUG-003.5: Field Guide (Ahead/Behind)
                     HStack(spacing: 6) {
+                        // Show ahead/behind counts as field guide
+                        if milestonesAhead > 0 || milestonesBehind > 0 {
+                            if milestonesBehind > 0 {
+                                Text("↑ \(milestonesBehind)")
+                                    .font(.caption.weight(.medium).monospacedDigit())
+                                    .foregroundStyle(Color.textTertiary)
+                            }
+                            if milestonesAhead > 0 {
+                                Text("↓ \(milestonesAhead)")
+                                    .font(.caption.weight(.medium).monospacedDigit())
+                                    .foregroundStyle(categoryColor(for: milestone))
+                            }
+                            Text("•")
+                                .foregroundStyle(Color.textTertiary)
+                        }
+
                         Text("Age \(milestone.targetAge(birthYear: user.birthYear))")
                             .font(.caption)
                             .foregroundStyle(Color.textSecondary)
@@ -63,15 +85,6 @@ struct MilestoneContextBar: View {
                             Text("•")
                                 .foregroundStyle(Color.textTertiary)
                             Text(category.displayName)
-                                .font(.caption)
-                                .foregroundStyle(Color.textSecondary)
-                        }
-
-                        // Horizons count (PRD: signals there are more to see)
-                        if totalCount > 1 {
-                            Text("•")
-                                .foregroundStyle(Color.textTertiary)
-                            Text("\(totalCount) horizons")
                                 .font(.caption)
                                 .foregroundStyle(Color.textSecondary)
                         }

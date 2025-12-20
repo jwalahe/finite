@@ -30,6 +30,14 @@ struct DotIndicatorFrameKey: PreferenceKey {
     }
 }
 
+// BUG-003.4: Scroll offset tracking for Drift-to-Rest
+struct ScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 struct SpineFrameKey: PreferenceKey {
     static var defaultValue: CGRect = .zero
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {

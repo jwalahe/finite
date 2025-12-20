@@ -125,6 +125,12 @@ struct GridView: View {
     @State private var currentWeekFrameForWalkthrough: CGRect = .zero
     @State private var dotIndicatorFrameForWalkthrough: CGRect = .zero
 
+    // BUG-003.4: Drift-to-Rest - scroll settles gently toward milestones
+    @State private var scrollOffset: CGFloat = 0
+    @State private var lastScrollEndTime: Date?
+    @State private var driftTask: Task<Void, Never>?
+    @Namespace private var scrollNamespace
+
     private let weeksPerRow: Int = 52
     private let revealDuration: Double = 2.0
     // CRAFT_SPEC: Screen margins 24pt
@@ -413,6 +419,78 @@ struct GridView: View {
         milestoneInfoCache = infos
     }
 
+    // MARK: - BUG-003.4: Drift-to-Rest
+
+    // Handle scroll offset changes - implements gentle "magnetic" settling toward milestones
+    // Like a marble settling into shallow divots - easy to scroll past, freedom preserved
+    private func handleScrollOffsetChange(_ offset: CGFloat, scrollProxy: ScrollViewProxy, rowHeight: CGFloat) {
+        // Only apply drift in Horizons mode
+        guard currentViewMode == .horizons else {
+            scrollOffset = offset
+            return
+        }
+
+        // Cancel any pending drift
+        driftTask?.cancel()
+
+        // Record current offset
+        scrollOffset = offset
+
+        // Detect scroll end: when offset stabilizes (velocity near zero)
+        // We use a debounce approach - if offset hasn't changed significantly after a delay, scroll ended
+        driftTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 200_000_000)  // 200ms debounce
+
+            guard !Task.isCancelled else { return }
+
+            // Check if scroll has stabilized (offset hasn't changed much)
+            let stillStable = abs(scrollOffset - offset) < 5
+            guard stillStable else { return }
+
+            // Find the nearest milestone within drift threshold
+            if let nearestMilestone = findNearestMilestoneForDrift(currentOffset: offset, rowHeight: rowHeight) {
+                // Gentle drift with spring animation - NOT a snap
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    scrollProxy.scrollTo("milestone-\(nearestMilestone)", anchor: .center)
+                }
+                HapticService.shared.selection()
+            }
+        }
+    }
+
+    // Find the nearest milestone if within drift threshold
+    // Returns nil if no milestone is close enough (freedom preserved)
+    private func findNearestMilestoneForDrift(currentOffset: CGFloat, rowHeight: CGFloat) -> Int? {
+        // Only consider upcoming milestones (in the future)
+        let upcomingMilestones = allMilestones.filter {
+            !$0.isCompleted && $0.targetWeekNumber > user.currentWeekNumber
+        }
+
+        guard !upcomingMilestones.isEmpty else { return nil }
+
+        // Calculate current visible row based on offset
+        // Offset is negative (scrolled content goes up)
+        let visibleRow = Int(abs(currentOffset) / rowHeight)
+        let visibleWeekStart = visibleRow * weeksPerRow + 1
+
+        // Drift threshold: within 2 rows (1 year) of a milestone
+        let driftThresholdWeeks = weeksPerRow * 2  // ~104 weeks = 2 years
+
+        // Find milestone closest to visible area
+        var nearestMilestone: Milestone?
+        var nearestDistance = Int.max
+
+        for milestone in upcomingMilestones {
+            let distance = abs(milestone.targetWeekNumber - visibleWeekStart)
+            if distance < driftThresholdWeeks && distance < nearestDistance {
+                nearestDistance = distance
+                nearestMilestone = milestone
+            }
+        }
+
+        return nearestMilestone?.targetWeekNumber
+    }
+
     // OPTIMIZATION: Pre-compute all grid colors for the current view mode
     // This runs once when mode changes, then Canvas just reads from array
     private func rebuildGridColorsCache() {
@@ -516,21 +594,45 @@ struct GridView: View {
 
             ZStack(alignment: .bottom) {
                 // Scrollable content (header + grid)
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 0) {
-                        headerView
-                            .padding(.bottom, 12)
+                // BUG-003.4: Wrapped in ScrollViewReader for Drift-to-Rest
+                ScrollViewReader { scrollProxy in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            headerView
+                                .padding(.bottom, 12)
 
-                        // Grid with age labels
-                        gridWithLabels(
-                            cellSize: cellSize,
-                            spacing: spacing,
-                            gridWidth: gridWidth,
-                            gridHeight: gridHeight
+                            // Grid with age labels
+                            gridWithLabels(
+                                cellSize: cellSize,
+                                spacing: spacing,
+                                gridWidth: gridWidth,
+                                gridHeight: gridHeight
+                            )
+
+                            // BUG-003.4: Milestone anchor points for drift-to-rest
+                            // Invisible anchors at each milestone row for scrollTo
+                            ForEach(Array(milestoneWeeksCache), id: \.self) { week in
+                                Color.clear
+                                    .frame(height: 1)
+                                    .id("milestone-\(week)")
+                            }
+                        }
+                        .padding(.top, 12)
+                        .padding(.bottom, footerZoneHeight)  // Prevent grid hiding behind footer
+                        // Track scroll offset for drift-to-rest
+                        .background(
+                            GeometryReader { inner in
+                                Color.clear.preference(
+                                    key: ScrollOffsetKey.self,
+                                    value: inner.frame(in: .named("scroll")).minY
+                                )
+                            }
                         )
                     }
-                    .padding(.top, 12)
-                    .padding(.bottom, footerZoneHeight)  // Prevent grid hiding behind footer
+                    .coordinateSpace(name: "scroll")
+                    .onPreferenceChange(ScrollOffsetKey.self) { offset in
+                        handleScrollOffsetChange(offset, scrollProxy: scrollProxy, rowHeight: rowHeight)
+                    }
                 }
 
                 // Fixed footer overlay at bottom of screen
@@ -913,7 +1015,6 @@ struct GridView: View {
         let milestoneColors = milestoneColorsCache
         let milestoneStatuses = milestoneStatusCache
         let milestoneCounts = milestoneCountCache
-        let currentWeek = currentWeekNumber
         let viewMode = currentViewMode
 
         return ZStack(alignment: .topLeading) {
@@ -1583,6 +1684,7 @@ struct GridView: View {
             // Milestone context bar - shows next milestone or add prompt
             // PRD: Tap main area → List sheet, tap [+] → Builder
             // During walkthrough, block all interactions (Horizons is last step)
+            // BUG-003.5: Includes field guide (ahead/behind counts)
             MilestoneContextBar(
                 milestone: nextMilestone,
                 totalCount: upcomingMilestoneCount,
@@ -1597,7 +1699,9 @@ struct GridView: View {
                     HapticService.shared.light()
                     milestoneToEdit = nil
                     showMilestoneBuilder = true
-                }
+                },
+                milestonesAhead: milestonesAheadOfScroll,
+                milestonesBehind: milestonesBehindScroll
             )
             .padding(.horizontal, 24)
         }
@@ -1611,6 +1715,32 @@ struct GridView: View {
     // Count of upcoming milestones (for context bar "X horizons" display)
     private var upcomingMilestoneCount: Int {
         milestones.filter { $0.targetWeekNumber >= user.currentWeekNumber }.count
+    }
+
+    // BUG-003.5: Field Guide - milestones ahead/behind based on scroll position
+    // "Ahead" = below current scroll position (further in future)
+    // "Behind" = above current scroll position (already scrolled past)
+    private var milestonesAheadOfScroll: Int {
+        // Calculate visible week from scroll offset
+        // Using approximate row height calculation
+        let rowHeight = (UIScreen.main.bounds.width - 48 - 48) / CGFloat(weeksPerRow) + 1.5
+        let visibleRow = max(0, Int(abs(scrollOffset) / rowHeight))
+        let visibleWeek = visibleRow * weeksPerRow + 1
+
+        return milestones.filter { $0.targetWeekNumber > visibleWeek + weeksPerRow * 5 }.count
+    }
+
+    private var milestonesBehindScroll: Int {
+        let rowHeight = (UIScreen.main.bounds.width - 48 - 48) / CGFloat(weeksPerRow) + 1.5
+        let visibleRow = max(0, Int(abs(scrollOffset) / rowHeight))
+        let visibleWeek = visibleRow * weeksPerRow + 1
+
+        // Behind = milestones we've scrolled past (above visible area)
+        // But only count upcoming ones (not completed)
+        return milestones.filter {
+            $0.targetWeekNumber > user.currentWeekNumber &&
+            $0.targetWeekNumber < visibleWeek
+        }.count
     }
 
     // Current phase for the user's current week

@@ -45,7 +45,7 @@
 ---
 
 ### BUG-003: Difficult to track/navigate Horizons on grid
-**Status:** Partially Resolved ✓ (3 of 5 features implemented)
+**Status:** Fully Resolved ✓ (5 of 5 features implemented)
 **Severity:** Medium (UX)
 **Found:** 2025-12-20
 **Resolved:** 2025-12-20
@@ -68,13 +68,17 @@
    - Only appears when EXACTLY on a milestone week (no hints for nearby)
    - Rewards curiosity, doesn't guide
 
-**Pending Features:**
+**Additional Implemented Features:**
 
-4. ⏳ **Drift-to-Rest** - Not yet implemented
-   - Scroll momentum that prefers to rest on milestones
+4. ✅ **Drift-to-Rest** - `handleScrollOffsetChange()` + `findNearestMilestoneForDrift()` in GridView
+   - Debounced scroll detection (200ms) with gentle spring animation
+   - Only active in Horizons mode, uses `ScrollViewReader` for programmatic scrolling
+   - "Like a marble settling into shallow divots" - easy to scroll past
 
-5. ⏳ **Context Bar as Field Guide** - Not yet implemented
-   - Shows "Ahead: X" and "Behind: Y" based on scroll position
+5. ✅ **Context Bar as Field Guide** - `MilestoneContextBar` updated
+   - Shows "↑ X" (behind) and "↓ Y" (ahead) based on scroll position
+   - Updates dynamically as user scrolls through the grid
+   - "Tells you about where you ARE, not where to go"
 
 **Rejected Patterns:**
 - ❌ Snap-to-milestone (constraint, not freedom)
