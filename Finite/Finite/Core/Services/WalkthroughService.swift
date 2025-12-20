@@ -100,6 +100,8 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
         switch self {
         case .swipeToChapters, .swipeToQuality, .swipeToHorizons:
             return true
+        case .complete:
+            return true  // Allow all gestures during completion screen
         default:
             return false
         }
@@ -110,6 +112,8 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
         switch self {
         case .markWeek:
             return true
+        case .complete:
+            return true  // Allow all gestures during completion screen
         default:
             return false
         }
@@ -120,6 +124,8 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
         switch self {
         case .markWeek:
             return true  // Allow tapping weeks to rate
+        case .complete:
+            return true  // Allow all gestures during completion screen
         default:
             return false
         }
@@ -130,6 +136,8 @@ enum WalkthroughStep: Int, CaseIterable, Identifiable {
         switch self {
         case .addPhase:
             return true
+        case .complete:
+            return true  // Allow all gestures during completion screen
         default:
             return false
         }

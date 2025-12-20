@@ -19,6 +19,9 @@ final class User {
     var lifeExpectancy: Int
     var currentViewModeRaw: String
     var milestoneAlertsEnabled: Bool
+    var soundEnabled: Bool = true
+    var hapticsEnabled: Bool = true
+    var streaksEnabled: Bool = false
 
     // State tracking
     var hasSeenReveal: Bool
@@ -33,6 +36,9 @@ final class User {
         self.lifeExpectancy = 80
         self.currentViewModeRaw = ViewMode.chapters.rawValue
         self.milestoneAlertsEnabled = true
+        self.soundEnabled = true
+        self.hapticsEnabled = true
+        self.streaksEnabled = false  // OFF by default for 29+ market
         self.hasSeenReveal = false
         self.hasSeenPhasePrompt = false
         self.hasSeenSwipeHint = false

@@ -1,47 +1,33 @@
-# Finite: Source of Truth
-## Complete Product & Engineering Specification
+# Finite: Complete Product Specification
+## Unified PRD — Source of Truth + Virality System
 
-> **Version:** 3.0 — Unified  
+> **Version:** 4.0 — Unified  
 > **Status:** Implementation Ready  
 > **Last Updated:** December 2025  
-> **Philosophy:** Your life has a past AND a future. Both deserve visualization.
+> **Target Market:** Adults 29+ seeking authentic tools for intentional living  
+> **Philosophy:** Your life has a past AND a future. Both deserve visualization. Privacy creates depth. Shareability creates reach.
 
 ---
 
-## Table of Contents
-
-1. [Vision & Philosophy](#1-vision--philosophy)
-2. [Design Principles](#2-design-principles)
-3. [Data Model](#3-data-model)
-4. [View Modes](#4-view-modes)
-5. [Signature Interactions](#5-signature-interactions)
-6. [Screen Specifications](#6-screen-specifications)
-7. [User Flows](#7-user-flows)
-8. [Grid System](#8-grid-system)
-9. [Design Tokens](#9-design-tokens)
-10. [Animations & Haptics](#10-animations--haptics)
-11. [Progressive Disclosure](#11-progressive-disclosure)
-12. [Edge Cases](#12-edge-cases)
-13. [Accessibility](#13-accessibility)
-14. [Implementation Checklist](#14-implementation-checklist)
+# Part I: Product Foundation
 
 ---
 
-# 1. Vision & Philosophy
+## 1. Vision & Philosophy
 
-## 1.1 The Product
+### 1.1 The Product
 
 Finite visualizes human life as a grid of ~4,000 weeks. It transforms abstract mortality into tangible awareness, creating urgency and intentionality.
 
 **Core Insight:** Mortality IS the ultimate deadline. When you see your life as finite weeks, every week becomes a choice.
 
-## 1.2 The Feeling
+### 1.2 The Feeling
 
 Users should feel like they're opening the book of their own life — one that rewards attention, reveals layers over time, and treats their existence with the gravity it deserves.
 
 We draw emotional architecture from complex narratives (Game of Thrones, Attack on Titan, One Piece) and craft standards from the world's slickest apps (Things 3, Linear, Superhuman, Arc Browser).
 
-## 1.3 Narrative UX Framework
+### 1.3 Narrative UX Framework
 
 Great stories create specific feelings through structural patterns. These patterns are encoded into our interaction design:
 
@@ -53,7 +39,7 @@ Great stories create specific feelings through structural patterns. These patter
 | **Scale Beyond View** | "I'm part of something vast" | Grid implies infinity; subtle depth effects; breathing at edges |
 | **Perspective Shifts** | "Same story, new meaning" | View modes as plot twists; same data, transformed understanding |
 
-## 1.4 Craft Standards
+### 1.4 Craft Standards
 
 **From Things 3:**
 - Every detail matters — custom UI components, consistent corners
@@ -73,9 +59,41 @@ Great stories create specific feelings through structural patterns. These patter
 
 ---
 
-# 2. Design Principles
+## 2. Target Market: The 29+ Demographic
 
-## 2.1 Core Principles
+### 2.1 Why 29+?
+
+Adults 29+ are fundamentally different from younger users. They represent Finite's ideal market because mortality awareness is no longer abstract — they've experienced loss and feel time's weight.
+
+### 2.2 What 29+ Users Have
+
+- **Higher stakes:** Careers, mortgages, relationships, aging parents
+- **Less time tolerance:** No patience for gamification that feels juvenile
+- **Genuine mortality awareness:** Unlike 22-year-olds, they've confronted finitude
+- **Disposable income:** Willing to pay for tools that genuinely work
+- **Decision fatigue:** Value simplicity and clarity over feature bloat
+
+### 2.3 What 29+ Users DON'T Want
+
+- Streaks that feel like manipulation (Duolingo owl energy)
+- Badges and achievements that feel patronizing
+- Confetti, celebrations, and performative positivity
+- Social features that feel like social media
+- Complexity masquerading as depth
+
+### 2.4 What 29+ Users WANT
+
+- Tools that respect their intelligence
+- Privacy and personal reflection space
+- Meaningful visualization of abstract concepts (time, life, progress)
+- Rituals that feel earned, not prescribed
+- Confrontation over comfort
+
+---
+
+## 3. Design Principles
+
+### 3.1 Core Principles
 
 1. **Earned Complexity** — Start simple. Let depth reveal itself over time.
 2. **Weight Without Heaviness** — Life is serious; the app shouldn't be oppressive.
@@ -83,13 +101,13 @@ Great stories create specific feelings through structural patterns. These patter
 4. **Signature Moments** — 2-3 interactions that are *unmistakably* Finite.
 5. **Temporal Gravity** — Past, present, and future should feel different.
 
-## 2.2 Friction Philosophy
+### 3.2 Friction Philosophy
 
 - Lowest possible friction for primary actions
 - Deliberate friction for irreversible actions (delete confirmation)
 - Zero friction for exploration (swipe between views freely)
 
-## 2.3 Information Hierarchy
+### 3.3 Information Hierarchy
 
 1. **The Grid** — Always primary, always visible
 2. **Current Week** — The anchor point, always prominent
@@ -98,11 +116,75 @@ Great stories create specific feelings through structural patterns. These patter
 
 ---
 
-# 3. Data Model
+## 4. Behavioral Psychology Framework
 
-## 3.1 Core Entities
+Most apps use surface-level psychology (streaks, badges, notifications). Finite goes deeper because mortality awareness IS the core product. The psychology doesn't need to be grafted on — it's intrinsic.
 
-### User
+### 4.1 Mortality Salience (Terror Management Theory)
+
+**Research Source:** Greenberg, Pyszczynski & Solomon (Terror Management Theory); PLOS One 2021
+
+**The Science:** Terror Management Theory shows that awareness of death triggers psychological defense mechanisms that profoundly change behavior. Mortality salience activates both proximal defenses (immediate coping) and distal defenses (pursuing meaningful goals, self-esteem enhancement).
+
+**What Competitors Miss:** Apps like WeCroak send death reminders but don't channel the response. They trigger anxiety without providing a constructive outlet. Research shows mortality salience increases prosocial behavior, goal pursuit, and self-regulation when channeled properly.
+
+**Finite's Advantage:** The grid IS the constructive outlet. When users feel mortality salience from seeing their life visualized, they need a place to put that energy. The weekly rating ritual transforms anxiety into reflection. The milestone feature transforms it into intentional planning.
+
+**Implementation:** Instead of push notifications that say "You have X weeks left" (WeCroak style), show the grid with a subtle animation of the current week fading. Visual representations of time create stronger mortality salience than text. Immediate ability to rate the week or set a milestone channels the emotion constructively.
+
+### 4.2 Fresh Start Effect (Temporal Landmarks)
+
+**Research Source:** Dai, Milkman & Riis (2014), Management Science
+
+**The Science:** Temporal landmarks (birthdays, new years, Mondays, month beginnings) motivate aspirational behavior by creating psychological "fresh starts" that help people distance themselves from past failures. Birthdays are the strongest trigger.
+
+**What Competitors Miss:** Most apps treat all days equally. They might offer "New Year" features but miss the hundreds of micro-landmarks throughout the year.
+
+**Finite's Advantage:** Every week IS a temporal landmark. Every row (year) is a fresh start. Every life phase transition is a major landmark. This is built into Finite's DNA.
+
+**Implementation:** Sunday evening prompt: "Week 1,547 is complete. Rate it and begin Week 1,548." Year-row transitions get special treatment — visual celebration when moving to a new row. Birthday weeks highlighted as major landmarks with special grid visualization.
+
+### 4.3 Loss Aversion & The Endowment Effect
+
+**Research Source:** Kahneman & Tversky (Prospect Theory, 1979)
+
+**The Science:** Losses are psychologically twice as powerful as equivalent gains. The Endowment Effect extends this: once we "own" something, we value it more and fear losing it.
+
+**What Competitors Miss:** Apps use loss aversion crudely through streak breaking. "Your 50-day streak!" feels manipulative because the streak has no intrinsic value — it's artificial scarcity.
+
+**Finite's Advantage:** The weeks themselves are the scarcity. You can't get them back. This is REAL loss, not manufactured. The filled circles on your grid represent actual time invested — the ultimate endowment.
+
+**Implementation:** "The Irreversible Mark" — Once a week is rated, it cannot be changed (or requires significant friction to change). Each rating decision matters. Unrated past weeks show as faded/empty — representing "lost" opportunities to capture that time.
+
+### 4.4 Commitment Devices & Pre-Commitment
+
+**Research Source:** Rogers et al. (2014), JAMA
+
+**The Science:** Commitment devices — self-imposed constraints that increase the cost of deviation — significantly improve goal achievement. People actively choose to bind their future selves because they recognize their own self-control problems.
+
+**Finite's Advantage:** "Horizons" feature creates commitment without external punishment. Setting a milestone ("Run a marathon by Week 1,600") on the grid creates psychological commitment. The deadline IS mortality.
+
+**Implementation:** Users place future milestones on the grid — they become visible markers. The closer you get to a milestone, the more prominent it becomes. If deadline passes without completion, the milestone remains visible as a question mark — not punishment, but honest record.
+
+### 4.5 Implementation Intentions
+
+**Research Source:** Gollwitzer (1999); Fabulous app case study
+
+**The Science:** Planning the specific when/where/how of a behavior dramatically increases follow-through. The Fabulous app saw 40% improvement in D7/D14 retention by adding "commitment contracts" with specific timing.
+
+**Finite's Advantage:** The weekly ritual IS an implementation intention. "Every Sunday at 8pm, I rate my week." This habit loop naturally emerges from the product structure.
+
+**Implementation:** "The Sunday Ritual" — Users set their preferred "Week End" time during onboarding. Single gentle notification at that time: "Week 1,547 awaits your reflection." The ritual takes <60 seconds — low friction, high meaning. Over time, this becomes identity: "I'm someone who reflects on their weeks."
+
+---
+
+# Part II: Core Product Specification
+
+---
+
+## 5. Data Model
+
+### 5.1 User
 
 ```swift
 import SwiftData
@@ -132,6 +214,7 @@ final class User {
     // Settings
     var soundEnabled: Bool = true
     var hapticsEnabled: Bool = true
+    var streaksEnabled: Bool = false  // OFF by default for 29+ market
     
     init(birthDate: Date, expectedLifespanYears: Int = 80) {
         self.birthDate = birthDate
@@ -140,7 +223,7 @@ final class User {
 }
 ```
 
-### Week
+### 5.2 Week
 
 ```swift
 @Model
@@ -161,7 +244,7 @@ final class Week {
 }
 ```
 
-### Milestone
+### 5.3 Milestone
 
 ```swift
 @Model
@@ -223,7 +306,7 @@ extension Milestone {
 }
 ```
 
-### LifePhase
+### 5.4 LifePhase
 
 ```swift
 @Model
@@ -244,7 +327,27 @@ final class LifePhase {
 }
 ```
 
-## 3.2 Query Patterns
+### 5.5 StreakData (Optional Feature)
+
+```swift
+struct StreakData {
+    var currentRatingStreak: Int = 0
+    var longestRatingStreak: Int = 0
+    var lastRatedWeek: Int = 0
+    
+    mutating func recordRating(for weekNumber: Int) {
+        if weekNumber == lastRatedWeek + 1 {
+            currentRatingStreak += 1
+        } else if weekNumber > lastRatedWeek + 1 {
+            currentRatingStreak = 1
+        }
+        lastRatedWeek = weekNumber
+        longestRatingStreak = max(longestRatingStreak, currentRatingStreak)
+    }
+}
+```
+
+### 5.6 Query Patterns
 
 ```swift
 // Milestones - CRITICAL: Query returns array, not single object
@@ -270,7 +373,7 @@ private var milestonesByWeek: [Int: [Milestone]] {
 }
 ```
 
-## 3.3 CRUD Operations (Bug Fix Pattern)
+### 5.7 CRUD Operations (Bug Fix Pattern)
 
 ```swift
 // ✅ CREATE NEW
@@ -312,9 +415,9 @@ func completeMilestone(_ milestone: Milestone, currentWeek: Int) {
 
 ---
 
-# 4. View Modes
+## 6. View Modes
 
-## 4.1 Overview
+### 6.1 Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -330,7 +433,7 @@ Swipe order: Chapters → Quality → Focus → Horizons → Chapters...
 Dot indicator: ● ○ ○ ○ (4 dots)
 ```
 
-## 4.2 Chapters View
+### 6.2 Chapters View
 
 **Purpose:** See your life as narrative arcs, not just time passed.
 
@@ -346,7 +449,7 @@ Dot indicator: ● ○ ○ ○ (4 dots)
 - Current phase: Name pulses once on view entry
 - Tap phase region → sheet shows phase details, adjustable boundaries
 
-## 4.3 Quality View
+### 6.3 Quality View
 
 **Purpose:** Reflect on how you've spent your time. Rate weeks. See patterns.
 
@@ -366,7 +469,7 @@ Dot indicator: ● ○ ○ ○ (4 dots)
 - Tap any past week → rate it (1-5 scale)
 - Pinch → zoom to year view
 
-## 4.4 Focus View
+### 6.4 Focus View
 
 **Purpose:** Confront mortality. Create urgency. Pure black and white.
 
@@ -385,7 +488,7 @@ Dot indicator: ● ○ ○ ○ (4 dots)
 - Minimal — this view is for contemplation
 - Long-press grid → shows remaining time in years/months/days
 
-## 4.5 Horizons View
+### 6.5 Horizons View
 
 **Purpose:** Forward-looking. Goals become visible landmarks in time.
 
@@ -409,11 +512,11 @@ Dot indicator: ● ○ ○ ○ (4 dots)
 
 ---
 
-# 5. Signature Interactions
+## 7. Signature Interactions
 
 These are the "plot twist" moments — interactions users will remember and tell others about.
 
-## 5.1 View Mode Transitions (The Perspective Shift)
+### 7.1 View Mode Transitions (The Perspective Shift)
 
 Switching views isn't a filter change — it's a *recontextualization* of your entire life.
 
@@ -439,7 +542,7 @@ Focus → Horizons:
 5. Haptic: ascending sequence of 3 soft taps
 ```
 
-## 5.2 First Launch Sequence (The Scale Revelation)
+### 7.2 First Launch Sequence (The Scale Revelation)
 
 ```
 1. FADE IN: Black screen (500ms)
@@ -465,7 +568,7 @@ Focus → Horizons:
 6. TRANSITION: Grid settles into normal view
 ```
 
-## 5.3 The Ghost Number (Focus View)
+### 7.3 The Ghost Number (Focus View)
 
 The barely-visible weeks-remaining counter that can be summoned.
 
@@ -481,7 +584,7 @@ Summon (tap):
 - Fade back to 8% (400ms, ease-out)
 ```
 
-## 5.4 Connection Web (Horizons View — V2)
+### 7.4 Connection Web (Horizons View — V2)
 
 Long-press milestone to reveal its narrative connections.
 
@@ -500,7 +603,7 @@ Response:
 6. Haptic: soft tick per connection
 ```
 
-## 5.5 Breathing Aura (All Views)
+### 7.5 Breathing Aura (All Views)
 
 Edges of grid have slow-pulsing gradient that implies life beyond the frame.
 
@@ -514,9 +617,9 @@ Edges of grid have slow-pulsing gradient that implies life beyond the frame.
 
 ---
 
-# 6. Screen Specifications
+## 8. Screen Specifications
 
-## 6.1 Main Grid View (All Modes)
+### 8.1 Main Grid View (All Modes)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -530,7 +633,7 @@ Edges of grid have slow-pulsing gradient that implies life beyond the frame.
 │  ┌─ GRID ──────────────────────────────────────────────────┐   │
 │  │                                                         │   │
 │  │  ●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●  │   │
-│  │  ●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●◉○○○○○○○○○  │   │
+│  │  ●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●◉○○○○○○○○○  │   │
 │  │  ○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○  │   │
 │  │  ○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○○  │   │
 │  │                                                         │   │
@@ -551,9 +654,9 @@ Edges of grid have slow-pulsing gradient that implies life beyond the frame.
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## 6.2 Horizons Context Bar
+### 8.2 Horizons Context Bar
 
-### Empty State
+#### Empty State
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -570,7 +673,7 @@ Corner radius: 12pt
 Tap: Entire bar → Opens Builder
 ```
 
-### With Milestones
+#### With Milestones
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -587,7 +690,7 @@ Corner radius: 12pt
 Padding: 16pt H, 12pt V
 ```
 
-## 6.3 Milestone List Sheet
+### 8.3 Milestone List Sheet
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -623,7 +726,7 @@ Padding: 16pt H, 12pt V
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## 6.4 Milestone Builder Sheet
+### 8.4 Milestone Builder Sheet
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -670,7 +773,7 @@ Padding: 16pt H, 12pt V
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## 6.5 Milestone Detail Sheet
+### 8.5 Milestone Detail Sheet
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -705,9 +808,9 @@ Padding: 16pt H, 12pt V
 
 ---
 
-# 7. User Flows
+## 9. User Flows
 
-## 7.1 First-Time User (Horizons)
+### 9.1 First-Time User (Horizons)
 
 ```
 User swipes to Horizons → Empty state context bar visible
@@ -723,7 +826,7 @@ Context bar shows this milestone
 Haptic: .success
 ```
 
-## 7.2 Adding Milestone
+### 9.2 Adding Milestone
 
 **Entry Points:**
 1. Tap [+] in context bar → pre-selected: 1 year from now
@@ -732,7 +835,7 @@ Haptic: .success
 
 All lead to Builder sheet in add mode.
 
-## 7.3 Viewing All Milestones
+### 9.3 Viewing All Milestones
 
 ```
 Tap context bar (main area, not [+])
@@ -744,7 +847,7 @@ Sections: Upcoming, Overdue, Completed
 Tap row → List dismisses (0.3s delay) → Detail opens
 ```
 
-## 7.4 Viewing Single Milestone
+### 9.4 Viewing Single Milestone
 
 ```
 Tap milestone marker on grid
@@ -754,7 +857,7 @@ Shows: Icon, name, category, stats (weeks/age/target), notes
 Actions: Mark Complete, Edit Horizon
 ```
 
-## 7.5 Editing Milestone
+### 9.5 Editing Milestone
 
 ```
 From Detail sheet: Tap "Edit Horizon"
@@ -771,7 +874,7 @@ Tap "Save" → UPDATE existing record
 Sheet dismisses, grid updates
 ```
 
-## 7.6 Completing Milestone
+### 9.6 Completing Milestone
 
 ```
 From Detail sheet: Tap "✓ Mark Complete"
@@ -787,7 +890,7 @@ Grid: Marker changes to ✓, fades to 50%
 Context bar: Updates to next milestone
 ```
 
-## 7.7 Deleting Milestone
+### 9.7 Deleting Milestone
 
 ```
 From Builder (edit mode): Tap "🗑️ Delete Horizon"
@@ -803,9 +906,9 @@ Grid: Marker removed with fade
 
 ---
 
-# 8. Grid System
+## 10. Grid System
 
-## 8.1 Visual Elements
+### 10.1 Visual Elements
 
 | Element | Symbol | Size | Description |
 |---------|--------|------|-------------|
@@ -816,7 +919,7 @@ Grid: Marker removed with fade
 | Completed | ✓ | 8pt | Achieved, faded |
 | Overdue | ⬡! | 8pt + badge | Past due, red tint |
 
-## 8.2 Week Rendering Logic
+### 10.2 Week Rendering Logic
 
 ```swift
 func weekView(for weekNumber: Int, in viewMode: ViewMode) -> some View {
@@ -844,9 +947,9 @@ func weekView(for weekNumber: Int, in viewMode: ViewMode) -> some View {
 }
 ```
 
-## 8.3 View-Specific Colors
+### 10.3 View-Specific Colors
 
-### Chapters
+#### Chapters
 ```swift
 func chaptersColor(for weekNumber: Int) -> Color {
     guard let phase = phase(for: weekNumber) else {
@@ -858,7 +961,7 @@ func chaptersColor(for weekNumber: Int) -> Color {
 }
 ```
 
-### Quality
+#### Quality
 ```swift
 func qualityColor(for weekNumber: Int) -> Color {
     guard weekNumber < currentWeekNumber else {
@@ -871,14 +974,14 @@ func qualityColor(for weekNumber: Int) -> Color {
 }
 ```
 
-### Focus
+#### Focus
 ```swift
 func focusColor(for weekNumber: Int) -> Color {
     weekNumber < currentWeekNumber ? .white : .black
 }
 ```
 
-### Horizons
+#### Horizons
 ```swift
 func horizonsColor(for weekNumber: Int, milestone: Milestone?) -> Color {
     if let milestone = milestone {
@@ -902,7 +1005,7 @@ func horizonsColor(for weekNumber: Int, milestone: Milestone?) -> Color {
 }
 ```
 
-## 8.4 Marker Density Handling
+### 10.4 Marker Density Handling
 
 **Adjacent Milestones (1-2 weeks apart):**
 - Both markers show, may overlap slightly
@@ -936,9 +1039,9 @@ func markerForWeek(_ weekNumber: Int) -> some View {
 
 ---
 
-# 9. Design Tokens
+## 11. Design Tokens
 
-## 9.1 Typography
+### 11.1 Typography
 
 ```swift
 struct FiniteTypography {
@@ -971,7 +1074,7 @@ struct FiniteTypography {
 }
 ```
 
-## 9.2 Colors
+### 11.2 Colors
 
 ```swift
 extension Color {
@@ -1019,7 +1122,7 @@ extension Color {
 }
 ```
 
-## 9.3 Spacing
+### 11.3 Spacing
 
 ```swift
 struct FiniteSpacing {
@@ -1051,9 +1154,9 @@ struct FiniteSpacing {
 
 ---
 
-# 10. Animations & Haptics
+## 12. Animations & Haptics
 
-## 10.1 Animation Curves
+### 12.1 Animation Curves
 
 ```swift
 extension Animation {
@@ -1068,7 +1171,7 @@ extension Animation {
 }
 ```
 
-## 10.2 Animation Specifications
+### 12.2 Animation Specifications
 
 | Action | Animation | Duration | Curve |
 |--------|-----------|----------|-------|
@@ -1082,7 +1185,7 @@ extension Animation {
 | Current week pulse | Scale 1→1.3→1 | 2s loop | .easeInOut |
 | List row tap | Highlight flash | 0.1s | .easeOut |
 
-## 10.3 Haptic Vocabulary
+### 12.3 Haptic Vocabulary
 
 | Action | Type | Style | Feeling |
 |--------|------|-------|---------|
@@ -1097,7 +1200,7 @@ extension Animation {
 | Week picker change | UISelectionFeedback | — | "Tick" |
 | Edge reached | UIImpactFeedback | .light | "Boundary" |
 
-## 10.4 Current Week Pulse
+### 12.4 Current Week Pulse
 
 ```swift
 struct PulsingDot: View {
@@ -1121,9 +1224,9 @@ struct PulsingDot: View {
 
 ---
 
-# 11. Progressive Disclosure
+## 13. Progressive Disclosure
 
-## 11.1 Week 1 Experience
+### 13.1 Week 1 Experience
 
 **Available:**
 - Grid view (Chapters mode only)
@@ -1139,7 +1242,7 @@ struct PulsingDot: View {
 
 **Why:** First week is about *seeing* your life. Don't overwhelm.
 
-## 11.2 Week 2 Experience
+### 13.2 Week 2 Experience
 
 **Unlocked:**
 - Quality view mode
@@ -1150,7 +1253,7 @@ struct PulsingDot: View {
 - Rate 3 weeks → unlock rating for any past week
 - Rate 7+ weeks → pattern hints appear
 
-## 11.3 Week 3-4 Experience
+### 13.3 Week 3-4 Experience
 
 **Unlocked:**
 - Focus view mode (with ghost number intro)
@@ -1160,7 +1263,7 @@ struct PulsingDot: View {
 **First Milestone Prompt:**
 "You've been here for 3 weeks. What's one thing you're working toward?"
 
-## 11.4 Month 2+ Experience
+### 13.4 Month 2+ Experience
 
 **Unlocked:**
 - Full connection web
@@ -1175,9 +1278,9 @@ struct PulsingDot: View {
 
 ---
 
-# 12. Edge Cases
+## 14. Edge Cases
 
-## 12.1 Milestone Edge Cases
+### 14.1 Milestone Edge Cases
 
 | Case | Handling |
 |------|----------|
@@ -1188,7 +1291,7 @@ struct PulsingDot: View {
 | Empty name | Save button disabled |
 | Rapid add/delete | SwiftData handles; haptic per action |
 
-## 12.2 Grid Edge Cases
+### 14.2 Grid Edge Cases
 
 | Case | Handling |
 |------|----------|
@@ -1196,7 +1299,7 @@ struct PulsingDot: View {
 | Scroll beyond lifespan | Subtle resistance, then allow with faded grid |
 | Milestone beyond visible grid | Indicator: "X milestones beyond view" |
 
-## 12.3 State Edge Cases
+### 14.3 State Edge Cases
 
 | Case | Handling |
 |------|----------|
@@ -1205,7 +1308,7 @@ struct PulsingDot: View {
 | Data corruption | Error state with reset option, iCloud backup |
 | No network (if sync added) | "Your life continues offline" |
 
-## 12.4 Empty States
+### 14.4 Empty States
 
 **No Milestones (Horizons):**
 ```
@@ -1223,9 +1326,9 @@ How was this one?"
 
 ---
 
-# 13. Accessibility
+## 15. Accessibility
 
-## 13.1 VoiceOver Labels
+### 15.1 VoiceOver Labels
 
 ```swift
 // Milestone marker
@@ -1253,13 +1356,13 @@ GhostNumber(value: weeksRemaining)
     .accessibilityHint("Double tap to reveal")
 ```
 
-## 13.2 Dynamic Type
+### 15.2 Dynamic Type
 
 - All text scales with system settings
 - Grid cell size fixed (accessibility alternative: list view)
 - Minimum touch targets: 44pt
 
-## 13.3 Reduce Motion
+### 15.3 Reduce Motion
 
 ```swift
 @Environment(\.accessibilityReduceMotion) var reduceMotion
@@ -1269,7 +1372,7 @@ var animation: Animation {
 }
 ```
 
-## 13.4 Color Contrast
+### 15.4 Color Contrast
 
 - All text meets WCAG AA
 - Milestone markers: sufficient contrast on grid
@@ -1277,175 +1380,733 @@ var animation: Animation {
 
 ---
 
-# 14. Implementation Checklist
-
-## Phase 1: Foundation (Weeks 1-2)
-
-### Data Layer
-- [ ] User model with computed properties
-- [ ] Week model for ratings
-- [ ] Milestone model with `@Attribute(.unique) var id`
-- [ ] LifePhase model
-- [ ] Query patterns (array, not single)
-- [ ] CRUD operations (INSERT vs UPDATE fix)
-
-### Grid
-- [ ] Grid performance (<16ms render)
-- [ ] Week rendering by view mode
-- [ ] Current week pulse
-- [ ] Touch handling per element
-
-### Tokens
-- [ ] Typography system
-- [ ] Color tokens
-- [ ] Spacing constants
-
-## Phase 2: View Modes (Weeks 3-4)
-
-### Chapters
-- [ ] Phase color rendering
-- [ ] Time spine component
-- [ ] Phase boundary gradients
-
-### Quality
-- [ ] Rating color spectrum
-- [ ] Week scrubber
-- [ ] Rating sheet
-
-### Focus
-- [ ] B&W rendering
-- [ ] Ghost number component
-- [ ] Summon animation
-
-### Horizons
-- [ ] 30% past opacity
-- [ ] Milestone markers (hexagon)
-- [ ] Context bar (empty + populated)
-
-## Phase 3: Milestones (Weeks 5-6)
-
-### Builder
-- [ ] Add mode
-- [ ] Edit mode
-- [ ] State initialization in `init()`
-- [ ] Mini grid preview
-- [ ] Week picker
-- [ ] Category chips
-
-### Detail
-- [ ] Stats display
-- [ ] Complete action
-- [ ] Edit transition
-
-### List
-- [ ] Sections: Upcoming, Overdue, Completed
-- [ ] Row → Detail navigation
-
-### Grid Integration
-- [ ] Markers render at weeks
-- [ ] Tap → Detail
-- [ ] Same-week handling
-
-## Phase 4: Signature Moments (Weeks 7-8)
-
-### View Transitions
-- [ ] Chapters → Quality
-- [ ] Quality → Focus
-- [ ] Focus → Horizons
-- [ ] Horizons → Chapters
-
-### First Launch
-- [ ] Onboarding sequence
-- [ ] Scale revelation animation
-
-### Ghost Number
-- [ ] Default 8% opacity
-- [ ] Tap to summon
-- [ ] Fade back
-
-### Polish
-- [ ] Haptics per spec
-- [ ] Breathing aura
-- [ ] Edge effects
-
-## Phase 5: Quality (Week 9)
-
-### Accessibility
-- [ ] VoiceOver labels
-- [ ] Dynamic Type
-- [ ] Reduce Motion
-
-### Edge Cases
-- [ ] All 12 cases handled
-
-### Performance
-- [ ] Grid: <16ms
-- [ ] Transitions: <400ms
-- [ ] Cold launch: <1.5s
+# Part III: Virality & Growth System
 
 ---
 
-# Appendix A: State Management
+## 16. The Virality Problem
 
-## Builder Mode Pattern
+### 16.1 Current State
+
+Finite is a deeply personal, private experience. Users see their life as ~4,000 weeks, rate their time, set future milestones. The emotional impact is powerful. **But nothing leaves the app.**
+
+```
+User downloads → Uses app → Loves it → ... (dead end)
+                                         ↑
+                                    No viral loop
+```
+
+### 16.2 The Virality Gap
+
+| What Finite Has | What Finite Lacks |
+|-----------------|-------------------|
+| Emotional punch | Shareable artifact |
+| Retention depth | Acquisition hook |
+| Personal meaning | Social identity signal |
+| Daily utility | "Show and tell" moment |
+
+### 16.3 The Core Tension
+
+**Privacy creates depth. Shareability creates reach.**
+
+The solution isn't to make Finite less private — it's to create **optional, user-controlled moments** where the experience can escape into the social graph.
+
+### 16.4 Benchmark Apps
+
+| App | Viral Mechanic | What They Share |
+|-----|----------------|-----------------|
+| Spotify | Wrapped | Listening stats, personality |
+| Strava | Activity cards | Runs, achievements |
+| Duolingo | Streak badges | Consistency, progress |
+| BeReal | Daily photo | Authenticity, FOMO |
+| Wordle | Score grid | Daily puzzle result |
+| WeCroak | Death reminders | Controversy, philosophy |
+
+**Common thread:** Each has a **shareable artifact** that signals identity and creates curiosity.
+
+---
+
+## 17. AIDA Framework Applied
+
+### 17.1 The Flow
+
+```
+ATTENTION: "What's that?"
+→ User sees Week Card on friend's Instagram story
+
+INTEREST: "Tell me more"
+→ Clicks link → Web preview shows their week number
+
+DESIRE: "I need this"
+→ Sees full grid, realizes the concept, wants to track own life
+
+ACTION: "Let me download"
+→ Downloads app → First "wow" moment → Creates own shareable
+```
+
+### 17.2 Feature Mapping to AIDA
+
+| Feature | Primary Stage | Psychology Used |
+|---------|--------------|-----------------|
+| Week Card | Attention | Identity Signaling |
+| Web Preview | Interest | Mortality Salience |
+| Widget | Attention | Passive Reminder |
+| Life Wrapped | Desire → Action | Annual Reflection |
+| Horizons | Retention | Commitment Devices |
+| Streak System (Optional) | Action | Loss Aversion |
+
+---
+
+## 18. Viral Feature: Week Card
+
+**The shareable identity artifact**
+
+### 18.1 Concept
+
+A beautiful, minimal card showing the user's current week number. One tap to generate, one tap to share. This becomes the user's "mortality signature" — a conversation starter that creates curiosity.
+
+**The Insight:** "What's your week number?" becomes a social question, like "What's your sign?" but grounded in mortality awareness.
+
+### 18.2 Visual Variants
+
+#### Default Card (Dark)
+
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│                                         │
+│            W E E K                      │
+│                                         │
+│             1,547                       │
+│                                         │
+│       ████████████░░░░░░░░░░░░░░        │
+│              37%                        │
+│                                         │
+│            ~ finite ~                   │
+│                                         │
+└─────────────────────────────────────────┘
+
+Dimensions: 1080 x 1920px (Stories) or 1080 x 1080px (Square)
+Background: #0A0A0A (near black)
+Week number: 120pt, SF Pro Display Light
+Progress bar: 4pt height, rounded
+Percentage: 17pt, secondary color
+Logo: 14pt, 20% opacity
+```
+
+#### Light Variant
+
+```
+Background: #FAFAFA (near white)
+Text: #1A1A1A
+```
+
+#### Minimal Variant (No Progress)
+
+Week number only, no progress bar.
+
+#### Grid Variant (Show Context)
+
+Shows life grid with current week highlighted.
+
+### 18.3 Entry Points
+
+1. **Profile/Settings** — "Share My Week" button
+2. **Main Grid** — Long-press current week → "Share"
+3. **Context Action** — Shake device (optional, delightful)
+
+### 18.4 Technical Implementation
 
 ```swift
-enum MilestoneBuilderMode {
-    case add(preselectedWeek: Int?)
-    case edit(Milestone)
+struct WeekCard: View {
+    let weekNumber: Int
+    let totalWeeks: Int
+    let style: WeekCardStyle
+    let format: WeekCardFormat
     
-    var isEditMode: Bool {
-        if case .edit = self { return true }
-        return false
+    enum WeekCardStyle {
+        case dark, light, minimal, grid
     }
     
-    var existingMilestone: Milestone? {
-        if case .edit(let m) = self { return m }
-        return nil
+    enum WeekCardFormat {
+        case stories  // 1080 x 1920
+        case square   // 1080 x 1080
+    }
+    
+    var percentageLived: Int {
+        Int((Double(weekNumber) / Double(totalWeeks)) * 100)
+    }
+}
+
+// Export function
+func exportWeekCard(style: WeekCardStyle, format: WeekCardFormat) -> UIImage {
+    let renderer = ImageRenderer(content: WeekCard(...))
+    renderer.scale = 3.0  // High resolution
+    return renderer.uiImage ?? UIImage()
+}
+```
+
+### 18.5 Metadata for Link Previews
+
+```html
+<meta property="og:title" content="Week 1,547">
+<meta property="og:description" content="I've lived 37% of my expected life. What week are you in?">
+<meta property="og:image" content="https://finite.app/cards/1547.png">
+<meta property="og:url" content="https://finite.app/week/1547">
+```
+
+---
+
+## 19. Viral Feature: Home Screen Widget
+
+**The passive viral surface**
+
+### 19.1 Concept
+
+A home screen widget showing the user's current week. When friends see the widget on the user's phone, it creates organic curiosity: "What's that app? What's week 1,547?"
+
+**The Insight:** Widgets are **always visible**. Unlike posts that disappear from feeds, a widget is a permanent signal on someone's phone. It's passive virality.
+
+### 19.2 Widget Sizes
+
+#### Small (2x2)
+
+```
+┌───────────────────┐
+│                   │
+│    WEEK 1,547     │
+│                   │
+│    2,613 left     │
+│                   │
+│      finite       │
+└───────────────────┘
+```
+
+#### Medium (4x2)
+
+```
+┌───────────────────────────────────────┐
+│                                       │
+│   WEEK 1,547              2,613 left  │
+│                                       │
+│   ████████████████░░░░░░░░░░░░░░░░░   │
+│                37%                    │
+│                              finite   │
+└───────────────────────────────────────┘
+```
+
+#### Large (4x4)
+
+Week + mini grid + next horizon.
+
+### 19.3 Configuration Options
+
+- **Show:** Week number / Weeks remaining / Percentage lived
+- **Theme:** Dark / Light / Auto
+- **Show Next Milestone:** Toggle on/off
+
+### 19.4 Technical Implementation
+
+```swift
+import WidgetKit
+import SwiftUI
+
+struct FiniteWidget: Widget {
+    let kind: String = "FiniteWidget"
+    
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: Provider()) { entry in
+            FiniteWidgetEntryView(entry: entry)
+        }
+        .configurationDisplayName("Your Week")
+        .description("See your current week number.")
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+    }
+}
+
+struct Provider: TimelineProvider {
+    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
+        // Update weekly (every Monday at midnight)
+        let nextUpdate = Calendar.current.nextDate(
+            after: Date(),
+            matching: DateComponents(weekday: 2, hour: 0),
+            matchingPolicy: .nextTime
+        )!
+        
+        let entry = SimpleEntry(date: Date(), weekNumber: calculateCurrentWeek())
+        let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+        completion(timeline)
     }
 }
 ```
 
-## Sheet Coordination
+---
+
+## 20. Viral Feature: Milestone Share
+
+**The achievement celebration**
+
+### 20.1 Concept
+
+When a user completes a milestone, create a moment of celebration that naturally invites sharing. The share artifact communicates accomplishment anchored to mortality — "I did this thing at week 1,547 of my life."
+
+### 20.2 Trigger Flow
+
+1. User taps "✓ Mark Complete" on a milestone
+2. Optional: Completion notes prompt ("How did it feel?")
+3. Celebration screen with subtle animation (NOT confetti — dignified)
+4. "Share This Win" button → generates share card
+5. Native share sheet opens
+
+### 20.3 Share Card Design
+
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│                  ✓                      │
+│                                         │
+│          H O R I Z O N                  │
+│           R E A C H E D                 │
+│                                         │
+│        "Run a marathon"                 │
+│                                         │
+│    ───────────────────────────────      │
+│                                         │
+│         43 weeks in the making          │
+│                                         │
+│        Week 1,590  ·  Age 30            │
+│                                         │
+│           ~ finite ~                    │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+### 20.4 Design Note (29+ Market)
+
+The celebration should be dignified, not juvenile. A single checkmark animation with a gentle haptic — NOT confetti, balloons, or excessive celebration. The weight of completing a life milestone doesn't need decoration.
+
+---
+
+## 21. Viral Feature: Life Wrapped
+
+**The annual summary — Finite's "Spotify Wrapped"**
+
+### 21.1 Concept
+
+At the end of each year (or on demand), generate a beautiful, shareable summary of the user's year in weeks. This is the highest-impact viral feature, designed to be shared widely during the natural "year in review" moment.
+
+### 21.2 Timing
+
+- **Auto-trigger:** Last week of December
+- **Manual access:** "Generate My Year" in settings (any time)
+- **Historical:** "View 2024 Wrapped" for past years
+
+### 21.3 The Sequence (7 screens)
+
+1. **Opening:** "YOUR 2025" — 52 weeks. One life.
+2. **The Grid:** Shows this year's row highlighted on full life grid
+3. **Quality Summary:** Weeks rated, average rating, overall assessment
+4. **Best Week:** Highlight of the year with user's notes
+5. **Milestones:** Horizons set, horizons reached
+6. **The Number:** "X weeks remain in your life. Make them count."
+7. **Share Card:** Final summary → "Share My Year"
+
+### 21.4 Final Share Card
+
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│            M Y   2 0 2 5                │
+│                                         │
+│       52 weeks lived                    │
+│       47 weeks rated                    │
+│       Average: 3.8 ★                    │
+│                                         │
+│       2 horizons reached                │
+│       2 horizons set                    │
+│                                         │
+│    ───────────────────────────────      │
+│                                         │
+│       Week 1,538 → 1,590                │
+│       2,570 weeks remaining             │
+│                                         │
+│           ~ finite ~                    │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+### 21.5 Push Notification
+
+End of December:
+```
+Your 2025 Wrapped is ready 🎉
+Tap to see your year in weeks.
+```
+
+---
+
+## 22. Psychology-Deep Features
+
+### 22.1 Horizons — Future Milestone Visualization
+
+**Psychology:** Commitment Devices + Temporal Scarcity
+
+Users place future milestones directly on the grid. These become visible markers that anchor goals to specific weeks of their life. The closer you get to a milestone, the more prominent it becomes.
+
+**Implementation:**
+- Tap any future week on the grid → "Set Horizon"
+- Enter milestone title (e.g., "Run a marathon")
+- Milestone appears on grid as distinct marker
+- As current week approaches, milestone grows/glows
+- If deadline passes without completion: milestone shows as "?" — not punishment, honest record
+
+### 22.2 Birthday Landmark Treatment
+
+**Psychology:** Fresh Start Effect (birthdays are the strongest trigger)
+
+Birthday weeks get special treatment on the grid. Research from Dai, Milkman & Riis shows birthdays are the single most powerful temporal landmark for motivating aspirational behavior.
+
+**Implementation:**
+- Birthday weeks highlighted with subtle ring/glow on grid
+- On birthday week: special prompt "Beginning year [X] of your life"
+- Optional: "What will define this year?" intention prompt
+- Shareable "New Year of Life" card
+
+### 22.3 Year-Row Transition Animation
+
+**Psychology:** Fresh Start Effect + Temporal Landmark
+
+When moving from one row (year of life) to the next, create a meaningful visual moment.
+
+**Implementation:**
+- When current week moves to new row: subtle animation
+- New row "lights up" or pulses briefly
+- Single deep haptic
+- Optional notification: "Year 31 of your life begins."
+
+### 22.4 The Irreversible Mark
+
+**Psychology:** Loss Aversion + Endowment Effect (authentic, not manufactured)
+
+Once a week is rated, it cannot be easily changed. This creates real weight — each rating decision matters.
+
+**Implementation:**
+- Ratings are permanent by default
+- To change: Settings → "Edit Past Rating" → friction (confirm dialog)
+- Unrated past weeks show as faded/empty on grid
+- Visual: Rated weeks have "permanence" — slightly different fill style
+
+---
+
+## 23. Optional Feature: Streak System
+
+### 23.1 Critical Design Decision
+
+**STREAKS ARE OFF BY DEFAULT.** Users must explicitly enable them in Settings. This respects the 29+ market while serving users who find streaks motivating.
+
+### 23.2 Implementation
+
+- Settings → "Enable Streak Tracking" → Toggle OFF by default
+- When enabled: Shows rating streak count
+- Streak type: Consecutive weeks rated (not check-ins)
+- Milestones: 4, 12, 26, 52, 104 weeks
+
+### 23.3 Streak Break Handling (Gentle)
+
+```
+"Your streak paused. You were at 8 weeks."
+"Life happens. Start fresh."
+
+Shows longest streak ever achieved.
+```
+
+### 23.4 Streak Share Card
+
+At milestone (e.g., 52 weeks):
+
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│                 🏆                       │
+│                                         │
+│          52 WEEK STREAK                 │
+│                                         │
+│    I rated every single week of         │
+│    my life for an entire year.          │
+│                                         │
+│    ████████████████████████████████     │
+│                                         │
+│    Weeks 1,538 → 1,590                  │
+│                                         │
+│           ~ finite ~                    │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## 24. Web Preview
+
+**Try before download — reduce friction to "aha"**
+
+### 24.1 Concept
+
+A simple web page (finite.app/preview) where anyone can enter their birth date and instantly see their week number. This removes the download barrier and creates the "aha" moment before commitment.
+
+### 24.2 URL Structure
+
+- `finite.app/preview` — Main calculator
+- `finite.app/week/1547` — Direct link to a week (for sharing)
+
+### 24.3 Technical Requirements
+
+- **No login required** — Instant calculation
+- **No data stored** — Privacy by design
+- **Fast** — Result appears within 500ms
+- **Mobile-first** — Primary traffic will be mobile
+- **Deep link ready** — finite.app/week/1547 pre-fills result
+
+### 24.4 Conversion Path
+
+```
+Visit preview → See week number → Emotional impact → 
+"See Your Full Grid" → App Store → Download
+```
+
+---
+
+## 25. The Complete Viral Loop
+
+### 25.1 The Flow
+
+```
+ATTENTION:
+User A shares Week Card on Instagram Stories
+→ User B sees it, thinks: "What's that?"
+
+INTEREST:
+User B taps link → finite.app/preview
+→ Enters birth date → Sees own week number
+→ "Oh wow, I'm in week 1,823. That's... a lot."
+
+DESIRE:
+User B sees the grid visualization
+→ Realizes the concept: life as finite weeks
+→ "I need to track this."
+
+ACTION:
+User B downloads app
+→ Completes onboarding → First "wow" moment
+→ Sets first milestone
+
+RETENTION:
+User B uses app weekly
+→ Rates weeks, tracks milestones
+→ Builds relationship with grid
+
+SHARE TRIGGER:
+User B completes milestone → "Share This Win"
+OR: Year ends → Life Wrapped
+OR: Just wants to share week number
+
+LOOP RESTARTS:
+User B shares → User C sees it → ATTENTION
+```
+
+### 25.2 Viral Coefficient Targets
+
+| Metric | Target | How to Achieve |
+|--------|--------|----------------|
+| % users who share | 15% | Easy share flows, beautiful cards |
+| Views per share | 200 | Instagram/Twitter optimization |
+| Click-through rate | 5% | Compelling hook, clear value |
+| Web → Download | 20% | Smooth preview, clear CTA |
+| K-factor | >0.5 | All of the above |
+
+---
+
+# Part IV: Implementation
+
+---
+
+## 26. Implementation Priority & Timeline
+
+### Phase 1: Foundation (Weeks 1-2)
+
+| Feature | Effort | Impact |
+|---------|--------|--------|
+| Data Layer (all models) | 3 days | Foundation |
+| Grid rendering | 3 days | Core experience |
+| Week Card (4 styles) | 2 days | Very High |
+| Widget (Small) | 2 days | High |
+
+**Goal:** Core app + first shareable artifacts.
+
+### Phase 2: View Modes (Weeks 3-4)
+
+| Feature | Effort | Impact |
+|---------|--------|--------|
+| Chapters View | 2 days | High |
+| Quality View | 2 days | High |
+| Focus View | 1 day | Medium |
+| Horizons View | 3 days | High |
+| Milestone Share | 2 days | Medium |
+
+**Goal:** All view modes functional.
+
+### Phase 3: Web Funnel (Weeks 5-6)
+
+| Feature | Effort | Impact |
+|---------|--------|--------|
+| Web Preview (finite.app/preview) | 5 days | Very High |
+| Deep Links | 2 days | Medium |
+| OG/Twitter Cards | 1 day | Medium |
+
+**Goal:** Acquisition path from social shares.
+
+### Phase 4: Psychology-Deep (Weeks 7-8)
+
+| Feature | Effort | Impact | Psychology |
+|---------|--------|--------|------------|
+| Horizons (Future Milestones) | 5 days | High | Commitment Devices |
+| Birthday Landmarks | 2 days | Medium | Fresh Start Effect |
+| Irreversible Ratings | 1 day | Medium | Loss Aversion |
+| Year-Row Transition | 1 day | Low | Temporal Landmark |
+
+**Goal:** Deepen retention with psychology-backed features.
+
+### Phase 5: Signature Polish (Week 9)
+
+| Feature | Effort | Impact |
+|---------|--------|--------|
+| First Launch Sequence | 3 days | High |
+| View Transitions | 2 days | Medium |
+| Ghost Number | 1 day | Medium |
+| Breathing Aura | 1 day | Low |
+
+**Goal:** Signature moments that create word-of-mouth.
+
+### Phase 6: Big Moment (November-December)
+
+| Feature | Effort | Impact |
+|---------|--------|--------|
+| Life Wrapped (7-screen sequence) | 2 weeks | Very High |
+| Wrapped Push Notification | 1 day | Medium |
+| Wrapped Share Flow | 3 days | High |
+
+**Goal:** Capitalize on "year in review" for maximum virality.
+
+### Phase 7: Market Expansion (Q1 Next Year)
+
+| Feature | Effort | Impact |
+|---------|--------|--------|
+| Streak System (Optional toggle) | 4 days | Medium |
+| Widget (Medium/Large) | 2 days | Low |
+| Shared Grids | 1 week | Medium |
+| Mortality Quotes | 2 days | Low |
+
+---
+
+## 27. Metrics & Success Criteria
+
+### 27.1 Primary Metrics
+
+| Metric | Definition | Target |
+|--------|------------|--------|
+| Share Rate | % of WAU who share any card | 15% |
+| Viral Coefficient (K) | New users per existing user | >0.5 |
+| Web → Download | Conversion rate from preview | 20% |
+| Weekly Rating Rate | % of users who rate their week | 60% |
+| Widget Install Rate | Users with active widget | 40% |
+
+### 27.2 Secondary Metrics
+
+| Metric | Definition | Target |
+|--------|------------|--------|
+| Cards Generated | Total share cards created | 10K/month |
+| Wrapped Completion | Users who finish 7-screen sequence | 80% |
+| Horizons Set | % of users with active milestones | 30% |
+| Press Mentions | Articles published | 5 in Q1 |
+
+### 27.3 Tracking Events
 
 ```swift
-@State private var showMilestoneList = false
-@State private var showMilestoneBuilder = false
-@State private var showMilestoneDetail = false
-@State private var builderMode: MilestoneBuilderMode = .add(preselectedWeek: nil)
-@State private var selectedMilestone: Milestone?
-
-// List → Detail transition
-private func selectMilestoneFromList(_ milestone: Milestone) {
-    showMilestoneList = false
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-        selectedMilestone = milestone
-        showMilestoneDetail = true
-    }
-}
-
-// Detail → Edit transition
-private func openBuilderForEdit(_ milestone: Milestone) {
-    showMilestoneDetail = false
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-        builderMode = .edit(milestone)
-        showMilestoneBuilder = true
-    }
+enum AnalyticsEvent {
+    case cardGenerated(type: ShareCardType)
+    case cardShared(type: ShareCardType, destination: ShareDestination)
+    case webPreviewVisited(source: String?)
+    case webPreviewConverted
+    case widgetInstalled(size: WidgetSize)
+    case milestoneCreated(category: String?)
+    case milestoneCompleted(weeksToComplete: Int)
+    case weekRated(rating: Int)
+    case viewModeChanged(from: ViewMode, to: ViewMode)
+    case wrappedStarted
+    case wrappedCompleted
+    case wrappedShared
 }
 ```
 
 ---
 
-# Appendix B: Bug Fix Reference
+## 28. What to Explicitly AVOID
 
-**The Problem:** Milestones overwrite instead of accumulating.
+Features and patterns that would alienate the 29+ market:
 
-**The Cause:** Either:
+- **Daily check-in requirements** — Weekly is enough. Respect their time.
+- **Aggressive notifications** — One gentle reminder per week max. No push notification spam.
+- **Badges and achievements** — Feels patronizing. The grid itself is the achievement.
+- **Confetti and excessive celebrations** — This is a serious app about mortality. Sobriety, not celebration.
+- **Social comparison/leaderboards** — Life isn't a competition. Personal reflection only.
+- **AI suggestions** — Human reflection, not algorithmic optimization.
+- **Complex journaling** — Keep it to spectrum + category + optional note. No friction.
+- **Required social features** — Everything social should be opt-in, not default.
+- **Streaks by default** — Only for users who explicitly enable them.
+
+---
+
+## 29. Press & Controversy Strategy
+
+### 29.1 Narrative Angles
+
+1. **"The Death App"** — "This App Shows You Exactly How Many Weeks You Have Left to Live"
+2. **"Life-Changing Perspective"** — "The App That Made Me Quit My Job and Chase My Dreams"
+3. **"Design as Meaning"** — "How a Grid of 4,000 Dots Can Change Your Life"
+
+### 29.2 Target Publications
+
+| Tier | Publications | Angle |
+|------|--------------|-------|
+| Tech | TechCrunch, The Verge, Wired | Design/Product |
+| Lifestyle | Fast Company, Esquire | Philosophy/Impact |
+| Design | Dezeen, It's Nice That | Craft/Aesthetics |
+| Wellness | Well+Good, Headspace blog | Mindfulness |
+| General | NYT, Guardian | Culture/Trend |
+
+### 29.3 Controversy Playbook
+
+**If criticized as "morbid":**
+> "We don't create mortality, we illuminate it. Denial doesn't extend life — awareness might improve it."
+
+**If compared to death reminder apps:**
+> "Finite isn't about death, it's about life. The grid isn't empty weeks until you die — it's full weeks you get to design."
+
+---
+
+## 30. Bug Fix Reference
+
+### The Problem
+
+Milestones overwrite instead of accumulating.
+
+### The Cause
+
+Either:
 1. Single-object query instead of array
 2. Always fetching first record
 3. Not using INSERT for new records
 
-**The Fix:**
+### The Fix
 
 ```swift
 // ✅ Query returns array
@@ -1472,7 +2133,8 @@ func save() {
 }
 ```
 
-**Verification Test:**
+### Verification Test
+
 1. Add "A" → verify appears
 2. Add "B" → verify BOTH appear
 3. Add "C" → verify ALL THREE appear
@@ -1481,9 +2143,9 @@ func save() {
 
 ---
 
-# Appendix C: Quick Reference Card
+## Appendix: Quick Reference
 
-## View Modes at a Glance
+### View Modes at a Glance
 
 | Mode | Purpose | Grid Color | Footer |
 |------|---------|------------|--------|
@@ -1492,7 +2154,7 @@ func save() {
 | Focus | Mortality | B&W | Ghost Number |
 | Horizons | Goals | Dimmed past + markers | Context Bar |
 
-## Haptic Vocabulary
+### Haptic Vocabulary
 
 ```
 View switch    → .medium (chapter turn)
@@ -1503,7 +2165,7 @@ Ghost summon   → .heavy (truth)
 Delete         → .medium (removed)
 ```
 
-## Animation Timings
+### Animation Timings
 
 ```
 Primary action: 250ms max
@@ -1513,13 +2175,28 @@ Pulse cycle: 1.2s / 2s
 Never exceed: 400ms
 ```
 
+### Psychology Quick Reference
+
+| Concept | Research Source | Finite Implementation |
+|---------|-----------------|----------------------|
+| Mortality Salience | Terror Management Theory | Grid visualization, Ghost Number |
+| Fresh Start Effect | Dai, Milkman & Riis (2014) | Weekly ritual, Birthday landmarks |
+| Loss Aversion | Kahneman & Tversky (1979) | Irreversible ratings, real time scarcity |
+| Commitment Devices | Rogers et al. (2014) | Horizons feature |
+| Implementation Intentions | Gollwitzer (1999) | Sunday Ritual, specific timing |
+
 ---
 
 **Document History:**
 - v1.0 — Initial Horizons PRD
 - v2.0 — Narrative UX integration
-- v3.0 — Unified source of truth (this document)
+- v3.0 — Unified source of truth
+- v4.0 — Combined with Virality PRD, behavioral psychology, 29+ market analysis
 
 ---
 
 *"Good design isn't just about solving surface-level pain points — it's about going deeper, redefining problems, and changing behavior."*
+
+*"The best marketing doesn't feel like marketing. It feels like sharing something meaningful."*
+
+*"Finite isn't about death, it's about life. The grid isn't empty weeks until you die — it's full weeks you get to design."*

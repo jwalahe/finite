@@ -42,6 +42,15 @@ struct GridView: View {
     // OPTIMIZATION: Cache phase colors for week numbers
     @State private var phaseColorsCache: [Int: String] = [:]
 
+    // OPTIMIZATION: Cache sorted phases to avoid re-sorting on every gradient calculation
+    @State private var sortedPhasesCache: [LifePhase] = []
+
+    // SST 6.3: Cache for weeks with notes (micro-indicator dot)
+    @State private var weeksWithNotesCache: Set<Int> = []
+
+    // SST 6.3: Cache for high-quality streaks (3+ consecutive weeks of rating 4-5)
+    @State private var highQualityStreakWeeks: Set<Int> = []
+
     // OPTIMIZATION: Pre-computed grid colors array for instant mode switching
     // Index = weekNumber - 1, stores resolved Color for each week
     @State private var gridColorsCache: [Color] = []
@@ -51,6 +60,9 @@ struct GridView: View {
     @State private var milestoneColorsCache: [Int: Color] = [:]
     @State private var milestoneStatusCache: [Int: MilestoneGridStatus] = [:]
     @State private var milestoneCountCache: [Int: Int] = [:]  // For same-week count badges
+
+    // BUG-003.3: Cache milestone info for loupe depth display
+    @State private var milestoneInfoCache: [Int: MilestoneDisplayInfo] = [:]
 
     // Status for grid rendering
     enum MilestoneGridStatus {
@@ -106,6 +118,9 @@ struct GridView: View {
 
     // Walkthrough state
     @StateObject private var walkthrough = WalkthroughService.shared
+
+    // View mode transition manager (SST 7.1 signature transitions)
+    @StateObject private var transitionManager = ViewModeTransitionManager()
     @State private var gridFrameForWalkthrough: CGRect = .zero
     @State private var currentWeekFrameForWalkthrough: CGRect = .zero
     @State private var dotIndicatorFrameForWalkthrough: CGRect = .zero
@@ -132,16 +147,73 @@ struct GridView: View {
             guard let rating = week.rating else { return nil }
             return (week.weekNumber, rating)
         })
+
+        // Also rebuild notes and streak caches
+        rebuildWeeksWithNotesCache()
+        rebuildHighQualityStreakCache()
+    }
+
+    // SST 6.3: Rebuild cache of weeks that have notes (phrase)
+    private func rebuildWeeksWithNotesCache() {
+        weeksWithNotesCache = Set(weeks.compactMap { week -> Int? in
+            guard let phrase = week.phrase, !phrase.isEmpty else { return nil }
+            return week.weekNumber
+        })
+    }
+
+    // SST 6.3: Rebuild cache of weeks that are part of high-quality streaks
+    // A streak is 3+ consecutive weeks with rating 4 or 5
+    private func rebuildHighQualityStreakCache() {
+        var streakWeeks: Set<Int> = []
+
+        // Get all weeks with high ratings (4 or 5), sorted
+        let highRatedWeeks = weeks
+            .compactMap { week -> Int? in
+                guard let rating = week.rating, rating >= 4 else { return nil }
+                return week.weekNumber
+            }
+            .sorted()
+
+        // Find consecutive streaks of 3+
+        var currentStreak: [Int] = []
+
+        for weekNum in highRatedWeeks {
+            if currentStreak.isEmpty {
+                currentStreak.append(weekNum)
+            } else if weekNum == currentStreak.last! + 1 {
+                // Consecutive - extend streak
+                currentStreak.append(weekNum)
+            } else {
+                // Gap - check if previous streak qualifies
+                if currentStreak.count >= 3 {
+                    streakWeeks.formUnion(currentStreak)
+                }
+                currentStreak = [weekNum]
+            }
+        }
+
+        // Check final streak
+        if currentStreak.count >= 3 {
+            streakWeeks.formUnion(currentStreak)
+        }
+
+        highQualityStreakWeeks = streakWeeks
     }
 
     // Rebuild phase colors cache from phases data
+    // SST 6.2: Phase boundaries have 5-week gradient blend between colors
     // Only includes weeks up to current week (phases don't color the future)
     private func rebuildPhaseColorsCache() {
         var cache: [Int: String] = [:]
         let birthYear = user.birthYear
         let currentWeek = currentWeekNumber
 
-        for phase in phases {
+        // Sort phases by start week for proper gradient calculation
+        // Also cache the sorted result for use in phaseBlendedColor
+        let sortedPhases = phases.sorted { $0.startWeek(birthYear: birthYear) < $1.startWeek(birthYear: birthYear) }
+        sortedPhasesCache = sortedPhases
+
+        for (index, phase) in sortedPhases.enumerated() {
             let startWeek = phase.startWeek(birthYear: birthYear)
             // Cap end week at current week - phases only color lived weeks
             let endWeek = min(phase.endWeek(birthYear: birthYear), currentWeek)
@@ -151,20 +223,147 @@ struct GridView: View {
             for weekNum in startWeek...endWeek {
                 cache[weekNum] = phase.colorHex
             }
+
+            // Check for next phase to create gradient blend at boundary
+            if index + 1 < sortedPhases.count {
+                let nextPhase = sortedPhases[index + 1]
+                let nextStartWeek = nextPhase.startWeek(birthYear: birthYear)
+                let boundaryWeek = endWeek
+
+                // Only blend if phases are adjacent or overlapping
+                if nextStartWeek <= boundaryWeek + 1 {
+                    // Create 5-week gradient blend zone (2 weeks before boundary, 2 after)
+                    let gradientHalfWidth = 2
+                    for offset in -gradientHalfWidth...gradientHalfWidth {
+                        let blendWeek = boundaryWeek + offset
+                        if blendWeek > 0 && blendWeek <= currentWeek {
+                            // Store gradient info - actual blending happens in rebuildGridColorsCache
+                            // For now, mark the boundary zone
+                            if offset < 0 {
+                                // Still in current phase
+                                cache[blendWeek] = phase.colorHex
+                            } else if offset > 0 {
+                                // In next phase
+                                cache[blendWeek] = nextPhase.colorHex
+                            }
+                            // offset == 0 is exactly at boundary, keep current phase color
+                        }
+                    }
+                }
+            }
         }
 
         phaseColorsCache = cache
     }
 
+    // Helper to get blended color at phase boundaries
+    // Returns the interpolated color for gradient transitions
+    // Uses sortedPhasesCache for performance (rebuilt in rebuildPhaseColorsCache)
+    private func phaseBlendedColor(for weekNumber: Int) -> Color? {
+        let birthYear = user.birthYear
+
+        // Use cached sorted phases for performance
+        let sortedPhases = sortedPhasesCache
+        guard !sortedPhases.isEmpty else { return nil }
+
+        // Find which phase boundary this week is near
+        for (index, phase) in sortedPhases.enumerated() {
+            let endWeek = phase.endWeek(birthYear: birthYear)
+
+            // Check if we're in a gradient zone near this phase's end
+            if index + 1 < sortedPhases.count {
+                let nextPhase = sortedPhases[index + 1]
+                let nextStartWeek = nextPhase.startWeek(birthYear: birthYear)
+
+                // Only create gradient for adjacent/overlapping phases
+                if nextStartWeek <= endWeek + 1 {
+                    let boundaryWeek = min(endWeek, nextStartWeek - 1)
+                    let gradientHalfWidth = 2
+
+                    // Check if this week is in the gradient zone
+                    if weekNumber >= boundaryWeek - gradientHalfWidth && weekNumber <= boundaryWeek + gradientHalfWidth {
+                        let offset = weekNumber - boundaryWeek
+                        // -2 to +2 maps to 0.0 to 1.0 blend factor
+                        let blendFactor = CGFloat(offset + gradientHalfWidth) / CGFloat(gradientHalfWidth * 2)
+
+                        let fromColor = Color.fromHex(phase.colorHex)
+                        let toColor = Color.fromHex(nextPhase.colorHex)
+
+                        return blendColors(from: fromColor, to: toColor, factor: blendFactor)
+                    }
+                }
+            }
+        }
+
+        return nil
+    }
+
+    // Blend two colors using linear interpolation
+    private func blendColors(from: Color, to: Color, factor: CGFloat) -> Color {
+        let clampedFactor = max(0, min(1, factor))
+
+        // Convert to UIColor for component access
+        let fromUI = UIColor(from)
+        let toUI = UIColor(to)
+
+        var fromR: CGFloat = 0, fromG: CGFloat = 0, fromB: CGFloat = 0, fromA: CGFloat = 0
+        var toR: CGFloat = 0, toG: CGFloat = 0, toB: CGFloat = 0, toA: CGFloat = 0
+
+        fromUI.getRed(&fromR, green: &fromG, blue: &fromB, alpha: &fromA)
+        toUI.getRed(&toR, green: &toG, blue: &toB, alpha: &toA)
+
+        let r = fromR + (toR - fromR) * clampedFactor
+        let g = fromG + (toG - fromG) * clampedFactor
+        let b = fromB + (toB - fromB) * clampedFactor
+        let a = fromA + (toA - fromA) * clampedFactor
+
+        return Color(red: r, green: g, blue: b, opacity: a)
+    }
+
+    // BUG-003.1: Gradient Foreshadowing
+    // Returns a blended color for weeks approaching a milestone (8-week zone, 30% max blend)
+    // Creates a sense of "something is coming" as you approach a milestone
+    private func milestoneForeshadowColor(for weekNumber: Int) -> Color? {
+        let foreshadowDistance = 8  // 8 weeks of approach zone
+        let maxBlend: CGFloat = 0.30  // 30% max blend toward milestone color
+
+        // Find the nearest upcoming milestone from this week
+        let upcomingMilestones = allMilestones.filter {
+            !$0.isCompleted && $0.targetWeekNumber > weekNumber
+        }.sorted { $0.targetWeekNumber < $1.targetWeekNumber }
+
+        guard let nearestMilestone = upcomingMilestones.first else { return nil }
+
+        let distance = nearestMilestone.targetWeekNumber - weekNumber
+
+        // Only foreshadow within the approach zone (and not on the milestone itself)
+        guard distance > 0 && distance <= foreshadowDistance else { return nil }
+
+        // Calculate blend factor: closer = stronger blend
+        // distance 8 → factor 0.0 (no blend)
+        // distance 1 → factor ~0.27 (30% * (7/8) since we cap at 30%)
+        let normalizedDistance = CGFloat(foreshadowDistance - distance) / CGFloat(foreshadowDistance)
+        let blendFactor = normalizedDistance * maxBlend
+
+        // Get milestone color
+        let milestoneColor = milestoneColorsCache[nearestMilestone.targetWeekNumber] ?? Color.textPrimary
+
+        // Blend from gridUnfilled toward milestone color
+        return blendColors(from: .gridUnfilled, to: milestoneColor, factor: blendFactor)
+    }
+
     // Rebuild milestone weeks cache for O(1) lookup during grid render
     // PRD: Include overdue (red), completed (checkmark), and same-week count badges
+    // BUG-003.3: Also builds milestoneInfoCache for loupe depth display
     private func rebuildMilestoneWeeksCache() {
         let currentWeek = user.currentWeekNumber
+        let birthYear = user.birthYear
 
         var weeks: Set<Int> = []
         var colors: [Int: Color] = [:]
         var statuses: [Int: MilestoneGridStatus] = [:]
         var counts: [Int: Int] = [:]
+        var infos: [Int: MilestoneDisplayInfo] = [:]
 
         for milestone in allMilestones {
             let week = milestone.targetWeekNumber
@@ -183,7 +382,7 @@ struct GridView: View {
                 status = .upcoming
             }
 
-            // Only set status/color if not already set (prioritize first milestone on same week)
+            // Only set status/color/info if not already set (prioritize first milestone on same week)
             if statuses[week] == nil {
                 statuses[week] = status
 
@@ -196,6 +395,14 @@ struct GridView: View {
                 case .upcoming:
                     colors[week] = Color.fromHex(milestone.displayColorHex)
                 }
+
+                // BUG-003.3: Build info for loupe depth
+                infos[week] = MilestoneDisplayInfo(
+                    name: milestone.name,
+                    categoryName: milestone.category?.displayName,
+                    targetAge: milestone.targetAge(birthYear: birthYear),
+                    createdAt: milestone.createdAt
+                )
             }
         }
 
@@ -203,6 +410,7 @@ struct GridView: View {
         milestoneColorsCache = colors
         milestoneStatusCache = statuses
         milestoneCountCache = counts
+        milestoneInfoCache = infos
     }
 
     // OPTIMIZATION: Pre-compute all grid colors for the current view mode
@@ -234,6 +442,9 @@ struct GridView: View {
             case .chapters:
                 if isCurrent {
                     color = .weekCurrent
+                } else if let blendedColor = phaseBlendedColor(for: weekNumber) {
+                    // SST 6.2: Use gradient-blended color at phase boundaries
+                    color = blendedColor
                 } else if let phaseHex = phaseColorsCache[weekNumber] {
                     color = Color.fromHex(phaseHex)
                 } else if isLived {
@@ -251,10 +462,14 @@ struct GridView: View {
                 }
             case .horizons:
                 // Horizons mode: past dimmed, future normal, milestones handled separately
+                // BUG-003.1: Gradient foreshadowing - weeks approaching milestone blend toward its color
                 if isCurrent {
                     color = .weekCurrent
                 } else if isLived {
                     color = .gridFilled.opacity(0.3)  // Dimmed past
+                } else if let foreshadowColor = milestoneForeshadowColor(for: weekNumber) {
+                    // Future week approaching a milestone - blend toward milestone color
+                    color = foreshadowColor
                 } else {
                     color = .gridUnfilled
                 }
@@ -381,6 +596,13 @@ struct GridView: View {
                 BreathingAura(phaseColor: currentAuraColor)
                     .ignoresSafeArea()
                     .transition(.opacity)
+            }
+
+            // Focus mode dim overlay (SST 7.1: 10% darker during Focus)
+            if transitionManager.dimOverlay > 0 {
+                Color.black.opacity(transitionManager.dimOverlay)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
             }
 
             // Walkthrough overlay (interactive guided tutorial)
@@ -639,6 +861,8 @@ struct GridView: View {
 
             }
             .frame(width: gridWidth, height: gridHeight)
+            // SST 7.1: Desaturation during view mode transitions
+            .saturation(1.0 - transitionManager.desaturation)
             .background(
                 GeometryReader { geo in
                     Color.clear.preference(
@@ -652,7 +876,7 @@ struct GridView: View {
                 walkthrough.gridFrame = frame
             }
             .contentShape(Rectangle())
-            .gesture(swipeGesture)
+            .highPriorityGesture(swipeGesture)
 
             // Right age labels
             VStack(alignment: .leading, spacing: 0) {
@@ -707,25 +931,45 @@ struct GridView: View {
                     let rect = CGRect(x: x, y: y, width: cellSize, height: cellSize)
 
                     // Draw milestone markers in Horizons view
+                    // BUG-003.2: Milestone Parallax/Depth - slight scale + shadow for "landmark" effect
                     if viewMode == .horizons && milestoneWeeks.contains(weekNumber) {
                         let status = milestoneStatuses[weekNumber]
                         let markerColor = milestoneColors[weekNumber] ?? Color.textPrimary
 
+                        // Depth effect: 15% larger for upcoming milestones, creates visual "lift"
+                        let depthScale: CGFloat = (status == .upcoming) ? 1.15 : 1.0
+                        let depthSize = cellSize * depthScale
+                        let depthOffset = (depthSize - cellSize) / 2
+                        let depthRect = CGRect(
+                            x: x - depthOffset,
+                            y: y - depthOffset,
+                            width: depthSize,
+                            height: depthSize
+                        )
+
+                        // Draw shadow for upcoming milestones (subtle depth cue)
+                        if status == .upcoming {
+                            let shadowOffset: CGFloat = 2
+                            let shadowRect = depthRect.offsetBy(dx: shadowOffset, dy: shadowOffset)
+                            let shadowHex = hexagonPath(in: shadowRect)
+                            context.fill(shadowHex, with: .color(Color.black.opacity(0.15)))
+                        }
+
                         switch status {
                         case .completed:
-                            // PRD: Completed = checkmark, faded
+                            // PRD: Completed = checkmark, faded (no depth effect)
                             // Draw a simple checkmark shape
                             let checkPath = checkmarkPath(in: rect)
                             context.fill(checkPath, with: .color(markerColor))
 
                         case .overdue:
-                            // PRD: Overdue = hexagon, red tint (in past zone)
+                            // PRD: Overdue = hexagon, red tint (no depth effect - in past)
                             let hexPath = hexagonPath(in: rect)
                             context.fill(hexPath, with: .color(markerColor))
 
                         case .upcoming, .none:
-                            // PRD: Upcoming = hexagon with category color
-                            let hexPath = hexagonPath(in: rect)
+                            // PRD: Upcoming = hexagon with category color + depth effect
+                            let hexPath = hexagonPath(in: depthRect)
                             context.fill(hexPath, with: .color(markerColor))
                         }
 
@@ -800,7 +1044,11 @@ struct GridView: View {
                     spacing: spacing,
                     gridColors: gridColorsCache,
                     weeksPerRow: weeksPerRow,
-                    totalWeeks: totalWeeks
+                    totalWeeks: totalWeeks,
+                    milestoneWeeks: currentViewMode == .horizons ? milestoneWeeksCache : [],
+                    milestoneColors: currentViewMode == .horizons ? milestoneColorsCache : [:],
+                    milestoneInfo: currentViewMode == .horizons ? milestoneInfoCache : [:],
+                    userBirthYear: user.birthYear
                 )
                 .transition(.scale.combined(with: .opacity))
                 .zIndex(200)
@@ -1017,7 +1265,8 @@ struct GridView: View {
         GeometryReader { _ in
             Color.clear
                 .contentShape(Rectangle())
-                .gesture(horizonsModeGesture(cellSize: cellSize, spacing: spacing))
+                // Use simultaneousGesture to allow swipe gestures to work alongside loupe
+                .simultaneousGesture(horizonsModeGesture(cellSize: cellSize, spacing: spacing))
                 .onTapGesture { location in
                     handleMilestoneTap(at: location, cellSize: cellSize, spacing: spacing)
                 }
@@ -1139,8 +1388,10 @@ struct GridView: View {
 
     // Computed property to determine if loupe gesture should be active
     // This helps SwiftUI properly observe changes
+    // Loupe works in Quality and Horizons views
     private var shouldEnableLoupeGesture: Bool {
-        currentViewMode == .quality && walkthrough.allowsLongPress
+        let isLoupeView = currentViewMode == .quality || currentViewMode == .horizons
+        return isLoupeView && walkthrough.allowsLongPress
     }
 
     private func weekTapTarget(cellSize: CGFloat, spacing: CGFloat) -> some View {
@@ -1149,7 +1400,8 @@ struct GridView: View {
                 .contentShape(Rectangle())
                 // Only attach loupe gesture when appropriate
                 // Using id() forces view recreation when shouldEnableLoupeGesture changes
-                .gesture(
+                // Use simultaneousGesture to allow swipe gestures to work alongside loupe
+                .simultaneousGesture(
                     shouldEnableLoupeGesture
                         ? qualityModeGesture(cellSize: cellSize, spacing: spacing)
                         : nil
@@ -1220,7 +1472,9 @@ struct GridView: View {
                             cellSize: cellSize,
                             spacing: spacing,
                             weeksPerRow: weeksPerRow,
-                            weeksLived: weeksLived
+                            weeksLived: weeksLived,
+                            totalWeeks: totalWeeks,
+                            allowFutureWeeks: currentViewMode == .horizons
                         )
                     }
                     // Update loupe position as user drags
@@ -1229,7 +1483,9 @@ struct GridView: View {
                         cellSize: cellSize,
                         spacing: spacing,
                         weeksPerRow: weeksPerRow,
-                        weeksLived: weeksLived
+                        weeksLived: weeksLived,
+                        totalWeeks: totalWeeks,
+                        allowFutureWeeks: currentViewMode == .horizons
                     )
                 }
             }
@@ -1572,15 +1828,19 @@ struct GridView: View {
     }
 
     private func cycleViewMode() {
-        HapticService.shared.light()
+        let previousMode = currentViewMode
         currentViewMode = currentViewMode.next
+
+        // Execute signature transition (SST 7.1)
+        executeViewModeTransition(from: previousMode, to: currentViewMode)
+
         user.currentViewMode = currentViewMode
         rebuildGridColorsCache()
         flashModeLabel()
     }
 
     private func swipeToNextMode() {
-        HapticService.shared.light()
+        let previousMode = currentViewMode
 
         // During walkthrough, override normal navigation to follow tutorial order
         if walkthrough.isActive {
@@ -1598,6 +1858,9 @@ struct GridView: View {
             currentViewMode = currentViewMode.next
         }
 
+        // Execute signature transition (SST 7.1)
+        executeViewModeTransition(from: previousMode, to: currentViewMode)
+
         user.currentViewMode = currentViewMode
         rebuildGridColorsCache()
         flashModeLabel()
@@ -1608,8 +1871,12 @@ struct GridView: View {
     }
 
     private func swipeToPreviousMode() {
-        HapticService.shared.light()
+        let previousMode = currentViewMode
         currentViewMode = currentViewMode.previous
+
+        // Execute signature transition (SST 7.1)
+        executeViewModeTransition(from: previousMode, to: currentViewMode)
+
         user.currentViewMode = currentViewMode
         rebuildGridColorsCache()
         flashModeLabel()
@@ -1617,6 +1884,17 @@ struct GridView: View {
 
         // Notify walkthrough of view mode change
         walkthrough.handleViewModeChanged(to: currentViewMode)
+    }
+
+    /// Execute signature view mode transition with choreographed animations
+    private func executeViewModeTransition(from: ViewMode, to: ViewMode) {
+        transitionManager.transition(
+            from: from,
+            to: to,
+            currentWeek: currentWeekNumber
+        ) {
+            // Transition complete - any cleanup can go here
+        }
     }
 
     // CRAFT_SPEC: Mode label flash - fade in 0.1s, hold 0.5s, fade out 0.2s (total 0.8s)
