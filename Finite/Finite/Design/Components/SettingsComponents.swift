@@ -134,6 +134,53 @@ struct SettingsTimeRow: View {
     }
 }
 
+// MARK: - Action Row (with Icon and Subtitle)
+
+struct SettingsActionRow: View {
+    let icon: String
+    let label: String
+    var subtitle: String? = nil
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: {
+            HapticService.shared.light()
+            action()
+        }) {
+            HStack(spacing: 12) {
+                // Icon
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.textPrimary)
+                    .frame(width: 24)
+
+                // Labels
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label)
+                        .font(.body)
+                        .foregroundStyle(Color.textPrimary)
+
+                    if let subtitle = subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.textTertiary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Destructive Row
 
 struct SettingsDestructiveRow: View {

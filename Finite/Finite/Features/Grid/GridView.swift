@@ -82,6 +82,9 @@ struct GridView: View {
     // Settings sheet
     @State private var showSettings: Bool = false
 
+    // Share Week sheet (Week Card viral feature)
+    @State private var showShareWeekSheet: Bool = false
+
     // Phase prompt and builder
     @State private var showPhasePrompt: Bool = false
     @State private var showPhaseBuilder: Bool = false
@@ -799,6 +802,9 @@ struct GridView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView(user: user)
         }
+        .sheet(isPresented: $showShareWeekSheet) {
+            ShareWeekSheet(user: user)
+        }
         .sheet(isPresented: $showPhaseBuilder) {
             PhaseFlowCoordinator(user: user, isPresented: $showPhaseBuilder)
                 .onDisappear {
@@ -1354,6 +1360,14 @@ struct GridView: View {
 
                 // Open week detail
                 selectedWeekForDetail = WeekIdentifier(value: currentWeekNumber)
+            }
+            .onLongPressGesture(minimumDuration: 0.5) {
+                // Block during walkthrough
+                guard !walkthrough.isActive else { return }
+
+                // Long-press current week → Share Week Card
+                HapticService.shared.medium()
+                showShareWeekSheet = true
             }
             .offset(x: x - (tapSize - cellSize) / 2, y: y - (tapSize - cellSize) / 2)
     }
