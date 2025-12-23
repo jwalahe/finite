@@ -124,6 +124,10 @@ struct GridView: View {
 
     // View mode transition manager (SST 7.1 signature transitions)
     @StateObject private var transitionManager = ViewModeTransitionManager()
+
+    // Share flow controller (SST §19 viral triggers)
+    @StateObject private var shareFlow = ShareFlowController.shared
+
     @State private var gridFrameForWalkthrough: CGRect = .zero
     @State private var currentWeekFrameForWalkthrough: CGRect = .zero
     @State private var dotIndicatorFrameForWalkthrough: CGRect = .zero
@@ -805,6 +809,19 @@ struct GridView: View {
         .sheet(isPresented: $showShareWeekSheet) {
             ShareWeekSheet(user: user)
         }
+        // SST §18: Viral share sheets triggered by emotional moments
+        .sheet(item: $shareFlow.activeSheet) { sheetType in
+            switch sheetType {
+            case .firstWeek, .ghostReveal, .quickShare:
+                PerspectiveShareSheet(user: user, triggerType: sheetType)
+            case .achievement(let milestone):
+                // TODO: AchievementShareSheet (next feature)
+                PerspectiveShareSheet(user: user, triggerType: sheetType)
+            case .yearTransition:
+                // TODO: YearTransitionShareSheet
+                PerspectiveShareSheet(user: user, triggerType: sheetType)
+            }
+        }
         .sheet(isPresented: $showPhaseBuilder) {
             PhaseFlowCoordinator(user: user, isPresented: $showPhaseBuilder)
                 .onDisappear {
@@ -1365,9 +1382,9 @@ struct GridView: View {
                 // Block during walkthrough
                 guard !walkthrough.isActive else { return }
 
-                // Long-press current week → Share Week Card
-                HapticService.shared.medium()
-                showShareWeekSheet = true
+                // Long-press current week → Share Perspective Card
+                // SST §18.6: "Preserved but de-prioritized. For power users."
+                shareFlow.onLongPressCurrentWeek()
             }
             .offset(x: x - (tapSize - cellSize) / 2, y: y - (tapSize - cellSize) / 2)
     }

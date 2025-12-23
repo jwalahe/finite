@@ -16,11 +16,19 @@ struct WeekDetailSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    // Query existing weeks to detect first rating
+    @Query private var allWeeks: [Week]
+
     @State private var rating: Int
     @State private var selectedCategory: WeekCategory?
     @State private var phrase: String
 
     private let ratingLabels = ["Awful", "Hard", "Okay", "Good", "Great"]
+
+    /// True if this will be the user's first ever week rating
+    private var isFirstRating: Bool {
+        allWeeks.isEmpty && existingWeek == nil
+    }
 
     init(user: User, weekNumber: Int, existingWeek: Week?) {
         self.user = user
@@ -129,6 +137,9 @@ struct WeekDetailSheet: View {
     }
 
     private func saveAndDismiss() {
+        // Capture first rating status BEFORE saving
+        let wasFirstRating = isFirstRating
+
         // Create or update week
         if let existingWeek = existingWeek {
             existingWeek.rating = rating
@@ -148,6 +159,12 @@ struct WeekDetailSheet: View {
         HapticService.shared.medium()
 
         dismiss()
+
+        // SST §18.2: Trigger share prompt after first rating
+        // "Fresh Start Effect. Beginning = share trigger."
+        if wasFirstRating {
+            ShareFlowController.shared.onFirstWeekRated()
+        }
     }
 }
 
