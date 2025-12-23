@@ -1,7 +1,7 @@
 # Finite: Complete Product Specification
 ## Unified PRD — Source of Truth + Virality System
 
-> **Version:** 4.0 — Unified  
+> **Version:** 5.0 — Viral Redesign  
 > **Status:** Implementation Ready  
 > **Last Updated:** December 2025  
 > **Target Market:** Adults 29+ seeking authentic tools for intentional living  
@@ -88,6 +88,20 @@ Adults 29+ are fundamentally different from younger users. They represent Finite
 - Meaningful visualization of abstract concepts (time, life, progress)
 - Rituals that feel earned, not prescribed
 - Confrontation over comfort
+
+### 2.5 What 29+ Users SHARE
+
+This demographic shares differently than Gen Z:
+
+| They Share | They Don't Share |
+|------------|-----------------|
+| Accomplishments with gravitas | Daily check-ins |
+| Wisdom/perspective | Streaks or points |
+| Life transitions | Gamification badges |
+| Reflections that make them look thoughtful | "Look at me" content |
+| Moments of meaning | Random status updates |
+
+**Key insight:** 29+ adults share **identity-affirming content** that positions them as thoughtful, intentional people.
 
 ---
 
@@ -176,6 +190,18 @@ Most apps use surface-level psychology (streaks, badges, notifications). Finite 
 
 **Implementation:** "The Sunday Ritual" — Users set their preferred "Week End" time during onboarding. Single gentle notification at that time: "Week 1,547 awaits your reflection." The ritual takes <60 seconds — low friction, high meaning. Over time, this becomes identity: "I'm someone who reflects on their weeks."
 
+### 4.6 Optimal Distinctiveness Theory (Sharing Psychology)
+
+**Research Source:** Marilynn Brewer (1991); Spotify Wrapped behavioral analysis
+
+**The Science:** People are torn between two needs: validation/similarity to others AND uniqueness/individuation. The most shareable content satisfies BOTH — it says "I belong" (everyone's sharing this) AND "I'm unique" (my result is mine).
+
+**What Competitors Miss:** Most share features focus only on achievement or only on participation. Spotify Wrapped succeeds because it gives everyone the same format (belonging) with personalized content (uniqueness).
+
+**Finite's Application:** The Week Card format is universal (everyone shares the same card style) but the content is deeply personal (your specific week, your perspective, your position in time). Users share to express identity, not just to show off.
+
+**Key Insight from Research:** "The goal of Wrapped is virality. That's absolutely the overriding goal." — Spotify's data lead. Every design choice should pass one test: "Does this increase the likelihood of sharing?"
+
 ---
 
 # Part II: Core Product Specification
@@ -209,6 +235,14 @@ final class User {
     
     var weeksRemaining: Int {
         max(0, totalWeeks - currentWeekNumber)
+    }
+    
+    var currentAge: Int {
+        currentWeekNumber / 52
+    }
+    
+    var percentageLived: Int {
+        Int((Double(currentWeekNumber) / Double(totalWeeks)) * 100)
     }
     
     // Settings
@@ -266,6 +300,9 @@ final class Milestone {
     var completedAt: Date?
     var completedWeekNumber: Int?
     
+    // Share tracking
+    var hasBeenShared: Bool = false
+    
     // Metadata
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
@@ -300,6 +337,11 @@ extension Milestone {
         max(0, targetWeekNumber - currentWeek)
     }
     
+    func weeksToComplete(from createdWeek: Int) -> Int {
+        guard let completedWeek = completedWeekNumber else { return 0 }
+        return completedWeek - createdWeek
+    }
+    
     func targetAge(birthDate: Date) -> Int {
         targetWeekNumber / 52
     }
@@ -327,22 +369,22 @@ final class LifePhase {
 }
 ```
 
-### 5.5 StreakData (Optional Feature)
+### 5.5 ShareEvent (Analytics)
 
 ```swift
-struct StreakData {
-    var currentRatingStreak: Int = 0
-    var longestRatingStreak: Int = 0
-    var lastRatedWeek: Int = 0
+@Model
+final class ShareEvent {
+    @Attribute(.unique) var id: UUID = UUID()
     
-    mutating func recordRating(for weekNumber: Int) {
-        if weekNumber == lastRatedWeek + 1 {
-            currentRatingStreak += 1
-        } else if weekNumber > lastRatedWeek + 1 {
-            currentRatingStreak = 1
-        }
-        lastRatedWeek = weekNumber
-        longestRatingStreak = max(longestRatingStreak, currentRatingStreak)
+    var type: String  // "perspective", "milestone", "ghost", "year_transition", "wrapped"
+    var weekNumber: Int
+    var milestoneId: UUID?
+    var perspectiveQuote: String?
+    var sharedAt: Date = Date()
+    
+    init(type: String, weekNumber: Int) {
+        self.type = type
+        self.weekNumber = weekNumber
     }
 }
 ```
@@ -487,6 +529,7 @@ Dot indicator: ● ○ ○ ○ (4 dots)
 **Interactions:**
 - Minimal — this view is for contemplation
 - Long-press grid → shows remaining time in years/months/days
+- **First Ghost Number reveal → Share Perspective prompt**
 
 ### 6.5 Horizons View
 
@@ -509,6 +552,7 @@ Dot indicator: ● ○ ○ ○ (4 dots)
 - Tap marker → Milestone detail sheet
 - Tap context bar → Milestone list sheet
 - Long-press marker → Connection web (V2)
+- **Milestone completion → Share Achievement prompt**
 
 ---
 
@@ -582,6 +626,9 @@ Summon (tap):
 - Haptic: hollow, resonant pulse
 - Hold at 100% for 2 seconds
 - Fade back to 8% (400ms, ease-out)
+
+FIRST TIME ONLY:
+- After fade, show Share Perspective prompt
 ```
 
 ### 7.4 Connection Web (Horizons View — V2)
@@ -887,7 +934,8 @@ Sheet dismisses
 Haptic: .success
     ↓
 Grid: Marker changes to ✓, fades to 50%
-Context bar: Updates to next milestone
+    ↓
+1.5s delay → Share Achievement Sheet appears
 ```
 
 ### 9.7 Deleting Milestone
@@ -1184,6 +1232,7 @@ extension Animation {
 | Ghost fade | 100→8% opacity | 0.4s | .easeOut |
 | Current week pulse | Scale 1→1.3→1 | 2s loop | .easeInOut |
 | List row tap | Highlight flash | 0.1s | .easeOut |
+| Share prompt appear | Slide up + fade | 0.3s | .spring |
 
 ### 12.3 Haptic Vocabulary
 
@@ -1199,6 +1248,7 @@ extension Animation {
 | Ghost summon | UIImpactFeedback | .heavy | "Confronting truth" |
 | Week picker change | UISelectionFeedback | — | "Tick" |
 | Edge reached | UIImpactFeedback | .light | "Boundary" |
+| Share prompt appear | UIImpactFeedback | .light | "Opportunity" |
 
 ### 12.4 Current Week Pulse
 
@@ -1248,6 +1298,7 @@ struct PulsingDot: View {
 - Quality view mode
 - Week rating (this week only)
 - First prompt: "How was last week? Rate it."
+- **First Week Celebration (Share Prompt)** after first rating
 
 **Gradual reveals:**
 - Rate 3 weeks → unlock rating for any past week
@@ -1259,6 +1310,7 @@ struct PulsingDot: View {
 - Focus view mode (with ghost number intro)
 - Horizons view mode
 - Milestone creation
+- **Ghost Number Share Prompt** (first Focus view visit)
 
 **First Milestone Prompt:**
 "You've been here for 3 weeks. What's one thing you're working toward?"
@@ -1380,194 +1432,813 @@ var animation: Animation {
 
 ---
 
-# Part III: Virality & Growth System
+# Part III: Virality & Share System
 
 ---
 
-## 16. The Virality Problem
+## 16. The Virality Problem (Solved)
 
-### 16.1 Current State
+### 16.1 What Was Wrong
 
-Finite is a deeply personal, private experience. Users see their life as ~4,000 weeks, rate their time, set future milestones. The emotional impact is powerful. **But nothing leaves the app.**
+The original share implementation failed because:
 
-```
-User downloads → Uses app → Loves it → ... (dead end)
-                                         ↑
-                                    No viral loop
-```
+| Issue | Psychology Violated |
+|-------|-------------------|
+| Share button in Settings | No emotional context. Utilities don't spark sharing. |
+| Long-press as primary entry | Hidden gesture = discovered by ~2% of users |
+| "Week number only" content | Missing narrative. No identity expression. |
+| No trigger moment | No psychological "share now" impulse |
+| 4 styles × 2 formats | Decision paralysis. Spotify Wrapped has ONE format. |
 
-### 16.2 The Virality Gap
+**Core problem:** Sharing was treated as a feature to access, not a moment to experience.
 
-| What Finite Has | What Finite Lacks |
-|-----------------|-------------------|
-| Emotional punch | Shareable artifact |
-| Retention depth | Acquisition hook |
-| Personal meaning | Social identity signal |
-| Daily utility | "Show and tell" moment |
+### 16.2 The Research Foundation
 
-### 16.3 The Core Tension
+From Spotify Wrapped behavioral analysis:
 
-**Privacy creates depth. Shareability creates reach.**
+> "The goal of Wrapped is virality. That's absolutely the overriding goal. If [a feature] derailed virality even 1%, it was a no-go."
 
-The solution isn't to make Finite less private — it's to create **optional, user-controlled moments** where the experience can escape into the social graph.
+From Optimal Distinctiveness Theory (Brewer, 1991):
 
-### 16.4 Benchmark Apps
+> People share content that satisfies TWO needs simultaneously: belonging (everyone shares this) AND uniqueness (my content is mine).
 
-| App | Viral Mechanic | What They Share |
-|-----|----------------|-----------------|
-| Spotify | Wrapped | Listening stats, personality |
-| Strava | Activity cards | Runs, achievements |
-| Duolingo | Streak badges | Consistency, progress |
-| BeReal | Daily photo | Authenticity, FOMO |
-| Wordle | Score grid | Daily puzzle result |
-| WeCroak | Death reminders | Controversy, philosophy |
+From behavioral studies on sharing:
 
-**Common thread:** Each has a **shareable artifact** that signals identity and creates curiosity.
+> "Users are co-creators of the content. This connection creates attachment."
 
----
+### 16.3 The Solution: Moment-Based Sharing
 
-## 17. AIDA Framework Applied
+Instead of "Share My Week" as a feature, we create **share-worthy moments** at emotional peaks:
 
-### 17.1 The Flow
+| Moment | Emotional State | Share Content |
+|--------|-----------------|---------------|
+| First week rated | "I've started something" | Perspective Card |
+| Milestone completed | "I achieved something" | Achievement Card |
+| Ghost number reveal | "This is heavy" | Perspective Card |
+| Birthday week | "New chapter" | Year Transition Card |
+| Year end | "Reflection time" | Life Wrapped |
 
-```
-ATTENTION: "What's that?"
-→ User sees Week Card on friend's Instagram story
-
-INTEREST: "Tell me more"
-→ Clicks link → Web preview shows their week number
-
-DESIRE: "I need this"
-→ Sees full grid, realizes the concept, wants to track own life
-
-ACTION: "Let me download"
-→ Downloads app → First "wow" moment → Creates own shareable
-```
-
-### 17.2 Feature Mapping to AIDA
-
-| Feature | Primary Stage | Psychology Used |
-|---------|--------------|-----------------|
-| Week Card | Attention | Identity Signaling |
-| Web Preview | Interest | Mortality Salience |
-| Widget | Attention | Passive Reminder |
-| Life Wrapped | Desire → Action | Annual Reflection |
-| Horizons | Retention | Commitment Devices |
-| Streak System (Optional) | Action | Loss Aversion |
+**Key insight:** The share prompt appears AFTER the emotional peak, when the user is already feeling something worth expressing.
 
 ---
 
-## 18. Viral Feature: Week Card
+## 17. Share Card System
 
-**The shareable identity artifact**
+### 17.1 Card Types
 
-### 18.1 Concept
+| Card Type | Trigger | Content | Priority |
+|-----------|---------|---------|----------|
+| **Perspective Card** | First rating, Ghost reveal, on-demand | Week + Position + Quote | A-Tier |
+| **Achievement Card** | Milestone completed | Milestone + Journey + Week | A-Tier |
+| **Year Transition Card** | Birthday week | New year of life | B-Tier |
+| **Life Wrapped** | December / on-demand | Annual summary | S-Tier (Phase 6) |
 
-A beautiful, minimal card showing the user's current week number. One tap to generate, one tap to share. This becomes the user's "mortality signature" — a conversation starter that creates curiosity.
+### 17.2 Card Styles (Simplified)
 
-**The Insight:** "What's your week number?" becomes a social question, like "What's your sign?" but grounded in mortality awareness.
+**From 8 options to 2:**
 
-### 18.2 Visual Variants
+| Style | Background | Text | Use Case |
+|-------|------------|------|----------|
+| **Dark** | #0A0A0A | White | Default. Stories-optimized. High contrast. |
+| **Light** | #FAFAFA | #1A1A1A | For users who prefer light mode. |
 
-#### Default Card (Dark)
+**Format:** Stories (1080×1920) only for V1. This is where viral content lives.
+
+**Why simplify:** 
+- Fewer choices = faster sharing
+- Spotify Wrapped uses ONE format
+- Decision paralysis kills conversion
+
+### 17.3 The Perspective Card
+
+The primary shareable artifact. Expresses identity, not just data.
 
 ```
 ┌─────────────────────────────────────────┐
 │                                         │
 │                                         │
-│            W E E K                      │
 │                                         │
-│             1,547                       │
+│           Week 1,547                    │  ← 72pt, SF Pro Light
+│            of ~4,160                    │  ← 24pt, secondary
 │                                         │
-│       ████████████░░░░░░░░░░░░░░        │
-│              37%                        │
+│              37%                        │  ← 20pt
+│       ▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░     │  ← 4pt height, 60% width
 │                                         │
-│            ~ finite ~                   │
+│                                         │
+│     "I'm learning to pay                │  ← 18pt, italic
+│      attention to my time."             │  ← User's perspective quote
+│                                         │
+│                                         │
+│       What's your week number?          │  ← 15pt, 60% opacity
+│                                         │
+│              finite                     │  ← 14pt, 20% opacity
 │                                         │
 └─────────────────────────────────────────┘
 
-Dimensions: 1080 x 1920px (Stories) or 1080 x 1080px (Square)
-Background: #0A0A0A (near black)
-Week number: 120pt, SF Pro Display Light
-Progress bar: 4pt height, rounded
-Percentage: 17pt, secondary color
-Logo: 14pt, 20% opacity
+Dimensions: 1080 × 1920px (9:16 Stories)
+Safe zones: 120px top, 200px bottom (for Stories UI)
+Export scale: 3x for high resolution
 ```
 
-#### Light Variant
+### 17.4 The Achievement Card
+
+Celebrates milestone completion with context.
 
 ```
-Background: #FAFAFA (near white)
-Text: #1A1A1A
+┌─────────────────────────────────────────┐
+│                                         │
+│                                         │
+│                  ⬡                      │  ← 48pt hexagon
+│                                         │
+│                                         │
+│           Run a marathon                │  ← 28pt, semibold
+│                                         │
+│    ─────────────────────────────────    │  ← 1pt line, 40% opacity
+│                                         │
+│         Set 43 weeks ago                │  ← 17pt, secondary
+│              Achieved                   │  ← 17pt, accent color
+│                                         │
+│                                         │
+│             Week 1,590                  │  ← 48pt
+│              Age 30                     │  ← 20pt, secondary
+│                                         │
+│                                         │
+│                                         │
+│       What are you working toward?      │  ← 15pt, 60% opacity
+│                                         │
+│              finite                     │
+│                                         │
+└─────────────────────────────────────────┘
 ```
 
-#### Minimal Variant (No Progress)
+### 17.5 The Year Transition Card
 
-Week number only, no progress bar.
+Marks entering a new year of life (birthday week).
 
-#### Grid Variant (Show Context)
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│                                         │
+│                                         │
+│                                         │
+│          Entering year 30               │  ← 24pt
+│            of my life                   │
+│                                         │
+│                                         │
+│           Week 1,561                    │  ← 48pt
+│                                         │
+│    ─────────────────────────────────    │
+│                                         │
+│      "The thirties. Let's see          │  ← 18pt, italic (optional)
+│       what I can make of them."         │
+│                                         │
+│                                         │
+│                                         │
+│              finite                     │
+│                                         │
+└─────────────────────────────────────────┘
+```
 
-Shows life grid with current week highlighted.
+### 17.6 The Perspective Quote System
 
-### 18.3 Entry Points
+Instead of just sharing data, users share their *perspective* on life.
 
-1. **Profile/Settings** — "Share My Week" button
-2. **Main Grid** — Long-press current week → "Share"
-3. **Context Action** — Shake device (optional, delightful)
+**Default quotes (user can pick or write their own):**
+```swift
+let defaultPerspectives = [
+    "I'm learning to pay attention to my time.",
+    "Every week is a decision.",
+    "This is week one of the rest of my life.",
+    "Mortality makes meaning.",
+    "I'm not running out of time. I'm running in time.",
+    "The future is a blank page I get to write.",
+    "Time is the only thing I can't get back."
+]
+```
 
-### 18.4 Technical Implementation
+**Custom quote:** Users can write their own (60 character limit)
+
+**Why this works:** Transforms data-sharing into identity-expression. The user is saying something about WHO THEY ARE, not just where they are.
+
+---
+
+## 18. Share Flow Specifications
+
+### 18.1 Share Flow Architecture
+
+```
+EMOTIONAL MOMENT occurs
+         │
+         ▼ 1.5 second delay (let moment land)
+         │
+┌─────────────────────┐
+│ Share Prompt Sheet  │
+│ (bottom sheet)      │
+└─────────────────────┘
+         │
+    ┌────┴────┐
+    │         │
+  Share    Not now
+    │         │
+    ▼         ▼
+┌─────────┐  Dismiss
+│ Card    │  (zero friction)
+│ Preview │
+│ + Quote │
+└─────────┘
+    │
+    ▼
+Native Share Sheet
+    │
+    ▼
+Record ShareEvent (analytics)
+```
+
+### 18.2 Trigger A: First Week Celebration
+
+**When:** User completes their first week rating ever.
+
+**Psychology:** Fresh Start Effect. Beginning = share trigger.
+
+**Flow:**
+
+```
+User taps rating → Rating saved
+    ↓
+Celebration moment (subtle — NOT confetti)
+    ↓
+1.5s delay
+    ↓
+First Week Share Sheet appears
+```
+
+**First Week Share Sheet:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│  ─────────────────────────────────────── (Drag)             │
+│                                                             │
+│                                                             │
+│          You've started something meaningful                │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │                                                     │   │
+│  │              [Card Preview]                         │   │
+│  │              Week 1,547                             │   │
+│  │              of ~4,160                              │   │
+│  │                                                     │   │
+│  │              37%                                    │   │
+│  │                                                     │   │
+│  │      "I'm paying attention now."                    │   │
+│  │                                                     │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              Share this moment                       │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│                       Not now                               │
+│                                                             │
+│  Presentation: .sheet, detent: .medium                     │
+│  Dismiss: Tap outside, "Not now", or swipe                 │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 18.3 Trigger B: Milestone Completed
+
+**When:** User marks any milestone as complete.
+
+**Psychology:** Achievement = natural share trigger. Shows intention + follow-through.
+
+**Flow:**
+
+```
+User taps "✓ Mark Complete"
+    ↓
+Milestone marked complete
+Detail sheet dismisses
+    ↓
+Completion animation on grid (marker → ✓)
+    ↓
+1.5s delay
+    ↓
+Achievement Share Sheet appears
+```
+
+**Achievement Share Sheet:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│  ─────────────────────────────────────── (Drag)             │
+│                                                             │
+│                          ⬡                                  │
+│                                                             │
+│                   Run a marathon                            │
+│                                                             │
+│                      Achieved                               │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │                                                     │   │
+│  │              [Achievement Card Preview]             │   │
+│  │                                                     │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│           Set 43 weeks ago at age 29                        │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              Share achievement                       │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│                        Done                                 │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 18.4 Trigger C: Ghost Number Reveal (First Time)
+
+**When:** User taps Ghost Number for the first time ever in Focus View.
+
+**Psychology:** Mortality salience at peak. Powerful share moment.
+
+**Flow:**
+
+```
+User taps Ghost Number (first time)
+    ↓
+Number animates to 100% (existing flow)
+    ↓
+Holds for 2 seconds
+    ↓
+Fades back to 8%
+    ↓
+0.5s pause
+    ↓
+Ghost Share Sheet appears
+```
+
+**Ghost Share Sheet:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│  ─────────────────────────────────────── (Drag)             │
+│                                                             │
+│                                                             │
+│                         2,613                               │
+│                      weeks remain                           │
+│                                                             │
+│                                                             │
+│          This number will never be this high again          │
+│                                                             │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │                                                     │   │
+│  │              [Perspective Card Preview]             │   │
+│  │                                                     │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              Share perspective                       │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│                       Reflect                               │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 18.5 Trigger D: Birthday Week (Year Transition)
+
+**When:** User opens app during their birthday week.
+
+**Psychology:** Temporal landmark. Birthday = natural reflection/share moment.
+
+**Detection:**
 
 ```swift
-struct WeekCard: View {
+func isBirthdayWeek(birthDate: Date, currentWeekNumber: Int) -> Bool {
+    let birthdayWeek = Calendar.current.component(.weekOfYear, from: birthDate)
+    let currentWeek = currentWeekNumber % 52
+    return birthdayWeek == currentWeek
+}
+```
+
+**Flow:**
+
+```
+User opens app on birthday week
+    ↓
+Check: Has user seen birthday prompt this year? No →
+    ↓
+After grid loads (1s delay)
+    ↓
+Year Transition Sheet appears
+```
+
+**Year Transition Sheet:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│  ─────────────────────────────────────── (Drag)             │
+│                                                             │
+│                                                             │
+│               Entering year 30 of your life                 │
+│                                                             │
+│                    Week 1,561 begins                        │
+│                                                             │
+│                                                             │
+│  ADD A THOUGHT (optional)                                   │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ The thirties. Let's see what I make of them.        │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │                                                     │   │
+│  │              [Year Transition Card Preview]         │   │
+│  │                                                     │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              Mark this moment                        │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│                      Continue                               │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 18.6 Secondary Entry: Long-Press Current Week
+
+**Preserved but de-prioritized.** For users who want to share on demand.
+
+```
+Long-press current week (500ms)
+    ↓
+Haptic: .medium
+    ↓
+Quick Share Sheet appears (simplified)
+```
+
+**Quick Share Sheet:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│  ─────────────────────────────────────── (Drag)             │
+│                                                             │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              [Perspective Card Preview]             │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  STYLE                                                      │
+│  ┌─────────┐    ┌─────────┐                                │
+│  │ ■ Dark  │    │ □ Light │                                │
+│  └─────────┘    └─────────┘                                │
+│                                                             │
+│  YOUR PERSPECTIVE                                           │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ I'm learning to pay attention...              [▼]   │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │                    Share                             │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 19. Share Technical Implementation
+
+### 19.1 Card Generation
+
+```swift
+import SwiftUI
+
+struct ShareCard: View {
+    let type: ShareCardType
     let weekNumber: Int
     let totalWeeks: Int
-    let style: WeekCardStyle
-    let format: WeekCardFormat
+    let style: CardStyle
+    let perspective: String?
+    let milestone: Milestone?
+    let age: Int
     
-    enum WeekCardStyle {
-        case dark, light, minimal, grid
+    enum ShareCardType {
+        case perspective
+        case achievement
+        case yearTransition
     }
     
-    enum WeekCardFormat {
-        case stories  // 1080 x 1920
-        case square   // 1080 x 1080
+    enum CardStyle {
+        case dark
+        case light
+        
+        var backgroundColor: Color {
+            switch self {
+            case .dark: return Color(hex: "#0A0A0A")
+            case .light: return Color(hex: "#FAFAFA")
+            }
+        }
+        
+        var textColor: Color {
+            switch self {
+            case .dark: return .white
+            case .light: return Color(hex: "#1A1A1A")
+            }
+        }
+        
+        var secondaryColor: Color {
+            textColor.opacity(0.6)
+        }
     }
     
     var percentageLived: Int {
         Int((Double(weekNumber) / Double(totalWeeks)) * 100)
     }
+    
+    var body: some View {
+        switch type {
+        case .perspective:
+            PerspectiveCardView(...)
+        case .achievement:
+            AchievementCardView(...)
+        case .yearTransition:
+            YearTransitionCardView(...)
+        }
+    }
 }
 
-// Export function
-func exportWeekCard(style: WeekCardStyle, format: WeekCardFormat) -> UIImage {
-    let renderer = ImageRenderer(content: WeekCard(...))
-    renderer.scale = 3.0  // High resolution
-    return renderer.uiImage ?? UIImage()
+// Export as image
+extension View {
+    func exportAsImage(scale: CGFloat = 3.0) -> UIImage {
+        let controller = UIHostingController(rootView: self)
+        let view = controller.view!
+        
+        let size = CGSize(width: 1080 / scale, height: 1920 / scale)
+        view.bounds = CGRect(origin: .zero, size: size)
+        view.backgroundColor = .clear
+        
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { _ in
+            view.drawHierarchy(in: view.bounds, afterScreenUpdates: true)
+        }
+    }
 }
 ```
 
-### 18.5 Metadata for Link Previews
+### 19.2 Share Flow Controller
+
+```swift
+import SwiftUI
+
+class ShareFlowController: ObservableObject {
+    @Published var activeSheet: ShareSheetType?
+    @Published var pendingMilestone: Milestone?
+    
+    enum ShareSheetType: Identifiable {
+        case firstWeek
+        case achievement(Milestone)
+        case ghostReveal
+        case yearTransition(Int)  // age
+        case quickShare
+        
+        var id: String {
+            switch self {
+            case .firstWeek: return "firstWeek"
+            case .achievement(let m): return "achievement-\(m.id)"
+            case .ghostReveal: return "ghostReveal"
+            case .yearTransition(let age): return "yearTransition-\(age)"
+            case .quickShare: return "quickShare"
+            }
+        }
+    }
+    
+    // MARK: - Trigger Checks
+    
+    private var hasShownFirstWeekPrompt: Bool {
+        get { UserDefaults.standard.bool(forKey: "hasShownFirstWeekPrompt") }
+        set { UserDefaults.standard.set(newValue, forKey: "hasShownFirstWeekPrompt") }
+    }
+    
+    private var hasShownGhostPrompt: Bool {
+        get { UserDefaults.standard.bool(forKey: "hasShownGhostPrompt") }
+        set { UserDefaults.standard.set(newValue, forKey: "hasShownGhostPrompt") }
+    }
+    
+    private var lastBirthdayYearShown: Int {
+        get { UserDefaults.standard.integer(forKey: "lastBirthdayYearShown") }
+        set { UserDefaults.standard.set(newValue, forKey: "lastBirthdayYearShown") }
+    }
+    
+    // MARK: - Triggers
+    
+    func onFirstWeekRated() {
+        guard !hasShownFirstWeekPrompt else { return }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            self.hasShownFirstWeekPrompt = true
+            self.activeSheet = .firstWeek
+        }
+    }
+    
+    func onMilestoneCompleted(_ milestone: Milestone) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            self.activeSheet = .achievement(milestone)
+        }
+    }
+    
+    func onGhostNumberRevealed() {
+        guard !hasShownGhostPrompt else { return }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {  // After ghost fades
+            self.hasShownGhostPrompt = true
+            self.activeSheet = .ghostReveal
+        }
+    }
+    
+    func onBirthdayWeekDetected(age: Int) {
+        guard lastBirthdayYearShown != age else { return }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.lastBirthdayYearShown = age
+            self.activeSheet = .yearTransition(age)
+        }
+    }
+    
+    func onLongPressCurrentWeek() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        activeSheet = .quickShare
+    }
+    
+    // MARK: - Share Execution
+    
+    func shareCard(_ card: ShareCard) {
+        let image = card.exportAsImage()
+        let activityVC = UIActivityViewController(
+            activityItems: [image],
+            applicationActivities: nil
+        )
+        
+        // Present
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let rootVC = windowScene.windows.first?.rootViewController {
+            rootVC.present(activityVC, animated: true)
+        }
+        
+        // Record analytics
+        recordShareEvent(type: card.type)
+    }
+    
+    private func recordShareEvent(type: ShareCard.ShareCardType) {
+        // Analytics implementation
+    }
+}
+```
+
+### 19.3 Perspective Quote Picker
+
+```swift
+struct PerspectiveQuotePicker: View {
+    @Binding var selectedQuote: String
+    @State private var isCustom = false
+    @State private var customText = ""
+    
+    let defaultQuotes = [
+        "I'm learning to pay attention to my time.",
+        "Every week is a decision.",
+        "This is week one of the rest of my life.",
+        "Mortality makes meaning.",
+        "I'm not running out of time. I'm running in time.",
+        "The future is a blank page I get to write."
+    ]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("YOUR PERSPECTIVE")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            
+            Menu {
+                ForEach(defaultQuotes, id: \.self) { quote in
+                    Button(quote) {
+                        selectedQuote = quote
+                        isCustom = false
+                    }
+                }
+                
+                Divider()
+                
+                Button("Write your own...") {
+                    isCustom = true
+                }
+            } label: {
+                HStack {
+                    Text(isCustom ? customText : selectedQuote)
+                        .lineLimit(2)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                }
+                .padding()
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(8)
+            }
+            
+            if isCustom {
+                TextField("Your perspective (60 chars)", text: $customText)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: customText) { _, newValue in
+                        if newValue.count <= 60 {
+                            selectedQuote = newValue
+                        } else {
+                            customText = String(newValue.prefix(60))
+                        }
+                    }
+            }
+        }
+    }
+}
+```
+
+---
+
+## 20. The Viral Question
+
+Every share must include the hook that creates curiosity:
+
+> **"What's your week number?"**
+
+This is Finite's equivalent of "What's your Wrapped?" — a social question that:
+
+1. **Creates curiosity** — Viewer doesn't know what "week number" means
+2. **Requires the app to answer** — You need Finite to calculate it
+3. **Becomes cultural** — "What's your week?" can become a social phrase
+
+**Implementation:** Every card includes this question near the bottom, plus the app name.
+
+---
+
+## 21. Web Preview for Conversion
+
+### 21.1 Concept
+
+A simple web page (finite.app/preview) where anyone can enter their birth date and instantly see their week number. This removes the download barrier and creates the "aha" moment before commitment.
+
+### 21.2 URL Structure
+
+- `finite.app/preview` — Main calculator
+- `finite.app/week/1547` — Direct link to a week (from share cards)
+
+### 21.3 Technical Requirements
+
+- **No login required** — Instant calculation
+- **No data stored** — Privacy by design
+- **Fast** — Result appears within 500ms
+- **Mobile-first** — Primary traffic will be mobile
+- **Deep link ready** — finite.app/week/1547 pre-fills result
+
+### 21.4 Conversion Path
+
+```
+See share card → "What's your week number?"
+    ↓
+Visit finite.app/preview
+    ↓
+Enter birth date
+    ↓
+See own week number (emotional impact)
+    ↓
+"See Your Full Grid" → App Store
+    ↓
+Download → First launch sequence → Own share moment
+```
+
+### 21.5 Metadata for Link Previews
 
 ```html
 <meta property="og:title" content="Week 1,547">
-<meta property="og:description" content="I've lived 37% of my expected life. What week are you in?">
-<meta property="og:image" content="https://finite.app/cards/1547.png">
+<meta property="og:description" content="I've lived 37% of my expected life. What's your week number?">
+<meta property="og:image" content="https://finite.app/cards/preview.png">
 <meta property="og:url" content="https://finite.app/week/1547">
 ```
 
 ---
 
-## 19. Viral Feature: Home Screen Widget
+## 22. Home Screen Widget
 
 **The passive viral surface**
 
-### 19.1 Concept
+### 22.1 Concept
 
 A home screen widget showing the user's current week. When friends see the widget on the user's phone, it creates organic curiosity: "What's that app? What's week 1,547?"
 
-**The Insight:** Widgets are **always visible**. Unlike posts that disappear from feeds, a widget is a permanent signal on someone's phone. It's passive virality.
-
-### 19.2 Widget Sizes
+### 22.2 Widget Sizes
 
 #### Small (2x2)
 
@@ -1595,113 +2266,28 @@ A home screen widget showing the user's current week. When friends see the widge
 └───────────────────────────────────────┘
 ```
 
-#### Large (4x4)
-
-Week + mini grid + next horizon.
-
-### 19.3 Configuration Options
+### 22.3 Configuration Options
 
 - **Show:** Week number / Weeks remaining / Percentage lived
 - **Theme:** Dark / Light / Auto
-- **Show Next Milestone:** Toggle on/off
-
-### 19.4 Technical Implementation
-
-```swift
-import WidgetKit
-import SwiftUI
-
-struct FiniteWidget: Widget {
-    let kind: String = "FiniteWidget"
-    
-    var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: Provider()) { entry in
-            FiniteWidgetEntryView(entry: entry)
-        }
-        .configurationDisplayName("Your Week")
-        .description("See your current week number.")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
-    }
-}
-
-struct Provider: TimelineProvider {
-    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
-        // Update weekly (every Monday at midnight)
-        let nextUpdate = Calendar.current.nextDate(
-            after: Date(),
-            matching: DateComponents(weekday: 2, hour: 0),
-            matchingPolicy: .nextTime
-        )!
-        
-        let entry = SimpleEntry(date: Date(), weekNumber: calculateCurrentWeek())
-        let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
-        completion(timeline)
-    }
-}
-```
 
 ---
 
-## 20. Viral Feature: Milestone Share
-
-**The achievement celebration**
-
-### 20.1 Concept
-
-When a user completes a milestone, create a moment of celebration that naturally invites sharing. The share artifact communicates accomplishment anchored to mortality — "I did this thing at week 1,547 of my life."
-
-### 20.2 Trigger Flow
-
-1. User taps "✓ Mark Complete" on a milestone
-2. Optional: Completion notes prompt ("How did it feel?")
-3. Celebration screen with subtle animation (NOT confetti — dignified)
-4. "Share This Win" button → generates share card
-5. Native share sheet opens
-
-### 20.3 Share Card Design
-
-```
-┌─────────────────────────────────────────┐
-│                                         │
-│                  ✓                      │
-│                                         │
-│          H O R I Z O N                  │
-│           R E A C H E D                 │
-│                                         │
-│        "Run a marathon"                 │
-│                                         │
-│    ───────────────────────────────      │
-│                                         │
-│         43 weeks in the making          │
-│                                         │
-│        Week 1,590  ·  Age 30            │
-│                                         │
-│           ~ finite ~                    │
-│                                         │
-└─────────────────────────────────────────┘
-```
-
-### 20.4 Design Note (29+ Market)
-
-The celebration should be dignified, not juvenile. A single checkmark animation with a gentle haptic — NOT confetti, balloons, or excessive celebration. The weight of completing a life milestone doesn't need decoration.
-
----
-
-## 21. Viral Feature: Life Wrapped
+## 23. Life Wrapped (Phase 6 — December)
 
 **The annual summary — Finite's "Spotify Wrapped"**
 
-### 21.1 Concept
+### 23.1 Concept
 
 At the end of each year (or on demand), generate a beautiful, shareable summary of the user's year in weeks. This is the highest-impact viral feature, designed to be shared widely during the natural "year in review" moment.
 
-### 21.2 Timing
+### 23.2 Timing
 
 - **Auto-trigger:** Last week of December
 - **Manual access:** "Generate My Year" in settings (any time)
 - **Historical:** "View 2024 Wrapped" for past years
 
-### 21.3 The Sequence (7 screens)
+### 23.3 The Sequence (7 screens)
 
 1. **Opening:** "YOUR 2025" — 52 weeks. One life.
 2. **The Grid:** Shows this year's row highlighted on full life grid
@@ -1711,7 +2297,7 @@ At the end of each year (or on demand), generate a beautiful, shareable summary 
 6. **The Number:** "X weeks remain in your life. Make them count."
 7. **Share Card:** Final summary → "Share My Year"
 
-### 21.4 Final Share Card
+### 23.4 Final Share Card
 
 ```
 ┌─────────────────────────────────────────┐
@@ -1735,201 +2321,61 @@ At the end of each year (or on demand), generate a beautiful, shareable summary 
 └─────────────────────────────────────────┘
 ```
 
-### 21.5 Push Notification
+---
 
-End of December:
-```
-Your 2025 Wrapped is ready 🎉
-Tap to see your year in weeks.
+## 24. What to Remove (Anti-Patterns)
+
+### 24.1 Removed from V1
+
+| Feature | Why Removed |
+|---------|-------------|
+| Share button in Settings | Anti-pattern. No emotional context. |
+| 4 style options | Decision paralysis. Keep 2 (Dark/Light). |
+| Square format | Stories is where virality lives. V2 if requested. |
+| Grid variant card | Too complex. Simplify to essential. |
+| Minimal variant | Redundant. Dark/Light is enough. |
+
+### 24.2 Preserved (Secondary)
+
+| Feature | Status |
+|---------|--------|
+| Long-press current week | Keep as secondary entry point for power users |
+
+---
+
+## 25. Success Metrics
+
+### 25.1 Primary Metrics
+
+| Metric | Definition | Target |
+|--------|------------|--------|
+| Share prompt → Share completed | % of prompts that result in shares | 15% |
+| Users who share (month 1) | % of MAU who share at least once | 25% |
+| Re-shares | Users who share 2+ times | 10% of sharers |
+| Web preview → Download | Conversion from finite.app | 20% |
+| K-factor | New users per existing user | >0.3 |
+
+### 25.2 Analytics Events
+
+```swift
+enum ShareAnalytics {
+    case promptShown(type: ShareSheetType)
+    case promptDismissed(type: ShareSheetType)
+    case cardCustomized(field: String)  // "style", "quote"
+    case shareInitiated(type: ShareCardType, destination: String?)
+    case shareCompleted(type: ShareCardType)
+    case webPreviewVisited(source: String?)
+    case webPreviewConverted
+}
 ```
 
 ---
 
-## 22. Psychology-Deep Features
-
-### 22.1 Horizons — Future Milestone Visualization
-
-**Psychology:** Commitment Devices + Temporal Scarcity
-
-Users place future milestones directly on the grid. These become visible markers that anchor goals to specific weeks of their life. The closer you get to a milestone, the more prominent it becomes.
-
-**Implementation:**
-- Tap any future week on the grid → "Set Horizon"
-- Enter milestone title (e.g., "Run a marathon")
-- Milestone appears on grid as distinct marker
-- As current week approaches, milestone grows/glows
-- If deadline passes without completion: milestone shows as "?" — not punishment, honest record
-
-### 22.2 Birthday Landmark Treatment
-
-**Psychology:** Fresh Start Effect (birthdays are the strongest trigger)
-
-Birthday weeks get special treatment on the grid. Research from Dai, Milkman & Riis shows birthdays are the single most powerful temporal landmark for motivating aspirational behavior.
-
-**Implementation:**
-- Birthday weeks highlighted with subtle ring/glow on grid
-- On birthday week: special prompt "Beginning year [X] of your life"
-- Optional: "What will define this year?" intention prompt
-- Shareable "New Year of Life" card
-
-### 22.3 Year-Row Transition Animation
-
-**Psychology:** Fresh Start Effect + Temporal Landmark
-
-When moving from one row (year of life) to the next, create a meaningful visual moment.
-
-**Implementation:**
-- When current week moves to new row: subtle animation
-- New row "lights up" or pulses briefly
-- Single deep haptic
-- Optional notification: "Year 31 of your life begins."
-
-### 22.4 The Irreversible Mark
-
-**Psychology:** Loss Aversion + Endowment Effect (authentic, not manufactured)
-
-Once a week is rated, it cannot be easily changed. This creates real weight — each rating decision matters.
-
-**Implementation:**
-- Ratings are permanent by default
-- To change: Settings → "Edit Past Rating" → friction (confirm dialog)
-- Unrated past weeks show as faded/empty on grid
-- Visual: Rated weeks have "permanence" — slightly different fill style
+# Part IV: Implementation Priority
 
 ---
 
-## 23. Optional Feature: Streak System
-
-### 23.1 Critical Design Decision
-
-**STREAKS ARE OFF BY DEFAULT.** Users must explicitly enable them in Settings. This respects the 29+ market while serving users who find streaks motivating.
-
-### 23.2 Implementation
-
-- Settings → "Enable Streak Tracking" → Toggle OFF by default
-- When enabled: Shows rating streak count
-- Streak type: Consecutive weeks rated (not check-ins)
-- Milestones: 4, 12, 26, 52, 104 weeks
-
-### 23.3 Streak Break Handling (Gentle)
-
-```
-"Your streak paused. You were at 8 weeks."
-"Life happens. Start fresh."
-
-Shows longest streak ever achieved.
-```
-
-### 23.4 Streak Share Card
-
-At milestone (e.g., 52 weeks):
-
-```
-┌─────────────────────────────────────────┐
-│                                         │
-│                 🏆                       │
-│                                         │
-│          52 WEEK STREAK                 │
-│                                         │
-│    I rated every single week of         │
-│    my life for an entire year.          │
-│                                         │
-│    ████████████████████████████████     │
-│                                         │
-│    Weeks 1,538 → 1,590                  │
-│                                         │
-│           ~ finite ~                    │
-│                                         │
-└─────────────────────────────────────────┘
-```
-
----
-
-## 24. Web Preview
-
-**Try before download — reduce friction to "aha"**
-
-### 24.1 Concept
-
-A simple web page (finite.app/preview) where anyone can enter their birth date and instantly see their week number. This removes the download barrier and creates the "aha" moment before commitment.
-
-### 24.2 URL Structure
-
-- `finite.app/preview` — Main calculator
-- `finite.app/week/1547` — Direct link to a week (for sharing)
-
-### 24.3 Technical Requirements
-
-- **No login required** — Instant calculation
-- **No data stored** — Privacy by design
-- **Fast** — Result appears within 500ms
-- **Mobile-first** — Primary traffic will be mobile
-- **Deep link ready** — finite.app/week/1547 pre-fills result
-
-### 24.4 Conversion Path
-
-```
-Visit preview → See week number → Emotional impact → 
-"See Your Full Grid" → App Store → Download
-```
-
----
-
-## 25. The Complete Viral Loop
-
-### 25.1 The Flow
-
-```
-ATTENTION:
-User A shares Week Card on Instagram Stories
-→ User B sees it, thinks: "What's that?"
-
-INTEREST:
-User B taps link → finite.app/preview
-→ Enters birth date → Sees own week number
-→ "Oh wow, I'm in week 1,823. That's... a lot."
-
-DESIRE:
-User B sees the grid visualization
-→ Realizes the concept: life as finite weeks
-→ "I need to track this."
-
-ACTION:
-User B downloads app
-→ Completes onboarding → First "wow" moment
-→ Sets first milestone
-
-RETENTION:
-User B uses app weekly
-→ Rates weeks, tracks milestones
-→ Builds relationship with grid
-
-SHARE TRIGGER:
-User B completes milestone → "Share This Win"
-OR: Year ends → Life Wrapped
-OR: Just wants to share week number
-
-LOOP RESTARTS:
-User B shares → User C sees it → ATTENTION
-```
-
-### 25.2 Viral Coefficient Targets
-
-| Metric | Target | How to Achieve |
-|--------|--------|----------------|
-| % users who share | 15% | Easy share flows, beautiful cards |
-| Views per share | 200 | Instagram/Twitter optimization |
-| Click-through rate | 5% | Compelling hook, clear value |
-| Web → Download | 20% | Smooth preview, clear CTA |
-| K-factor | >0.5 | All of the above |
-
----
-
-# Part IV: Implementation
-
----
-
-## 26. Implementation Priority & Timeline
+## 26. Implementation Timeline
 
 ### Phase 1: Foundation (Weeks 1-2)
 
@@ -1937,43 +2383,43 @@ User B shares → User C sees it → ATTENTION
 |---------|--------|--------|
 | Data Layer (all models) | 3 days | Foundation |
 | Grid rendering | 3 days | Core experience |
-| Week Card (4 styles) | 2 days | Very High |
-| Widget (Small) | 2 days | High |
+| Basic view modes | 3 days | Core experience |
 
-**Goal:** Core app + first shareable artifacts.
+**Goal:** Core app functional.
 
-### Phase 2: View Modes (Weeks 3-4)
+### Phase 2: Share System V1 (Weeks 3-4)
 
 | Feature | Effort | Impact |
 |---------|--------|--------|
-| Chapters View | 2 days | High |
-| Quality View | 2 days | High |
-| Focus View | 1 day | Medium |
-| Horizons View | 3 days | High |
-| Milestone Share | 2 days | Medium |
+| ShareCard component (Perspective + Achievement) | 3 days | Very High |
+| ShareFlowController | 2 days | Very High |
+| Milestone completion → Share prompt | 1 day | Very High |
+| First rating → Share prompt | 1 day | High |
+| Ghost reveal → Share prompt | 1 day | High |
+| Long-press current week | 0.5 days | Medium |
 
-**Goal:** All view modes functional.
+**Goal:** Moment-based sharing functional.
 
-### Phase 3: Web Funnel (Weeks 5-6)
+### Phase 3: Polish & Widget (Weeks 5-6)
+
+| Feature | Effort | Impact |
+|---------|--------|--------|
+| Card style refinement | 2 days | High |
+| Perspective quote picker | 1 day | High |
+| Widget (Small + Medium) | 3 days | High |
+| Birthday week detection | 1 day | Medium |
+
+**Goal:** Shareable artifacts polished.
+
+### Phase 4: Web Funnel (Weeks 7-8)
 
 | Feature | Effort | Impact |
 |---------|--------|--------|
 | Web Preview (finite.app/preview) | 5 days | Very High |
-| Deep Links | 2 days | Medium |
-| OG/Twitter Cards | 1 day | Medium |
+| OG/Twitter Card metadata | 1 day | Medium |
+| Deep linking | 2 days | Medium |
 
 **Goal:** Acquisition path from social shares.
-
-### Phase 4: Psychology-Deep (Weeks 7-8)
-
-| Feature | Effort | Impact | Psychology |
-|---------|--------|--------|------------|
-| Horizons (Future Milestones) | 5 days | High | Commitment Devices |
-| Birthday Landmarks | 2 days | Medium | Fresh Start Effect |
-| Irreversible Ratings | 1 day | Medium | Loss Aversion |
-| Year-Row Transition | 1 day | Low | Temporal Landmark |
-
-**Goal:** Deepen retention with psychology-backed features.
 
 ### Phase 5: Signature Polish (Week 9)
 
@@ -1986,70 +2432,19 @@ User B shares → User C sees it → ATTENTION
 
 **Goal:** Signature moments that create word-of-mouth.
 
-### Phase 6: Big Moment (November-December)
+### Phase 6: Life Wrapped (November-December)
 
 | Feature | Effort | Impact |
 |---------|--------|--------|
-| Life Wrapped (7-screen sequence) | 2 weeks | Very High |
-| Wrapped Push Notification | 1 day | Medium |
-| Wrapped Share Flow | 3 days | High |
+| Wrapped 7-screen sequence | 2 weeks | Very High |
+| Wrapped push notification | 1 day | Medium |
+| Wrapped share flow | 3 days | High |
 
 **Goal:** Capitalize on "year in review" for maximum virality.
 
-### Phase 7: Market Expansion (Q1 Next Year)
-
-| Feature | Effort | Impact |
-|---------|--------|--------|
-| Streak System (Optional toggle) | 4 days | Medium |
-| Widget (Medium/Large) | 2 days | Low |
-| Shared Grids | 1 week | Medium |
-| Mortality Quotes | 2 days | Low |
-
 ---
 
-## 27. Metrics & Success Criteria
-
-### 27.1 Primary Metrics
-
-| Metric | Definition | Target |
-|--------|------------|--------|
-| Share Rate | % of WAU who share any card | 15% |
-| Viral Coefficient (K) | New users per existing user | >0.5 |
-| Web → Download | Conversion rate from preview | 20% |
-| Weekly Rating Rate | % of users who rate their week | 60% |
-| Widget Install Rate | Users with active widget | 40% |
-
-### 27.2 Secondary Metrics
-
-| Metric | Definition | Target |
-|--------|------------|--------|
-| Cards Generated | Total share cards created | 10K/month |
-| Wrapped Completion | Users who finish 7-screen sequence | 80% |
-| Horizons Set | % of users with active milestones | 30% |
-| Press Mentions | Articles published | 5 in Q1 |
-
-### 27.3 Tracking Events
-
-```swift
-enum AnalyticsEvent {
-    case cardGenerated(type: ShareCardType)
-    case cardShared(type: ShareCardType, destination: ShareDestination)
-    case webPreviewVisited(source: String?)
-    case webPreviewConverted
-    case widgetInstalled(size: WidgetSize)
-    case milestoneCreated(category: String?)
-    case milestoneCompleted(weeksToComplete: Int)
-    case weekRated(rating: Int)
-    case viewModeChanged(from: ViewMode, to: ViewMode)
-    case wrappedStarted
-    case wrappedCompleted
-    case wrappedShared
-}
-```
-
----
-
-## 28. What to Explicitly AVOID
+## 27. What to Explicitly AVOID
 
 Features and patterns that would alienate the 29+ market:
 
@@ -2062,128 +2457,39 @@ Features and patterns that would alienate the 29+ market:
 - **Complex journaling** — Keep it to spectrum + category + optional note. No friction.
 - **Required social features** — Everything social should be opt-in, not default.
 - **Streaks by default** — Only for users who explicitly enable them.
-
----
-
-## 29. Press & Controversy Strategy
-
-### 29.1 Narrative Angles
-
-1. **"The Death App"** — "This App Shows You Exactly How Many Weeks You Have Left to Live"
-2. **"Life-Changing Perspective"** — "The App That Made Me Quit My Job and Chase My Dreams"
-3. **"Design as Meaning"** — "How a Grid of 4,000 Dots Can Change Your Life"
-
-### 29.2 Target Publications
-
-| Tier | Publications | Angle |
-|------|--------------|-------|
-| Tech | TechCrunch, The Verge, Wired | Design/Product |
-| Lifestyle | Fast Company, Esquire | Philosophy/Impact |
-| Design | Dezeen, It's Nice That | Craft/Aesthetics |
-| Wellness | Well+Good, Headspace blog | Mindfulness |
-| General | NYT, Guardian | Culture/Trend |
-
-### 29.3 Controversy Playbook
-
-**If criticized as "morbid":**
-> "We don't create mortality, we illuminate it. Denial doesn't extend life — awareness might improve it."
-
-**If compared to death reminder apps:**
-> "Finite isn't about death, it's about life. The grid isn't empty weeks until you die — it's full weeks you get to design."
-
----
-
-## 30. Bug Fix Reference
-
-### The Problem
-
-Milestones overwrite instead of accumulating.
-
-### The Cause
-
-Either:
-1. Single-object query instead of array
-2. Always fetching first record
-3. Not using INSERT for new records
-
-### The Fix
-
-```swift
-// ✅ Query returns array
-@Query var allMilestones: [Milestone]
-
-// ✅ State initialized correctly
-init(mode: Mode) {
-    switch mode {
-    case .add:
-        _name = State(initialValue: "")
-    case .edit(let m):
-        _name = State(initialValue: m.name)
-    }
-}
-
-// ✅ Save handles both
-func save() {
-    switch mode {
-    case .add:
-        modelContext.insert(Milestone(...))
-    case .edit(let existing):
-        existing.name = name
-    }
-}
-```
-
-### Verification Test
-
-1. Add "A" → verify appears
-2. Add "B" → verify BOTH appear
-3. Add "C" → verify ALL THREE appear
-4. Edit "B" → verify A and C unchanged
-5. Delete "A" → verify B and C remain
+- **Share buttons in Settings** — Anti-pattern. No emotional context.
+- **Too many card options** — Decision paralysis kills conversion.
 
 ---
 
 ## Appendix: Quick Reference
 
-### View Modes at a Glance
+### Share Triggers at a Glance
 
-| Mode | Purpose | Grid Color | Footer |
-|------|---------|------------|--------|
-| Chapters | Life as story | Phase colors | Time Spine |
-| Quality | Reflection | Rating spectrum | Scrubber |
-| Focus | Mortality | B&W | Ghost Number |
-| Horizons | Goals | Dimmed past + markers | Context Bar |
+| Trigger | When | Card Type | One-time? |
+|---------|------|-----------|-----------|
+| First week rated | After first rating | Perspective | Yes |
+| Milestone completed | After completion | Achievement | No (per milestone) |
+| Ghost number reveal | First Focus view tap | Perspective | Yes |
+| Birthday week | App open on birthday week | Year Transition | Once per year |
+| Long-press current week | On demand | Perspective | No |
+| Life Wrapped | December | Wrapped | Once per year |
 
-### Haptic Vocabulary
+### Card Types at a Glance
 
-```
-View switch    → .medium (chapter turn)
-Week selected  → .light (touch time)
-Milestone made → .success (achievement)
-Milestone done → .success (done!)
-Ghost summon   → .heavy (truth)
-Delete         → .medium (removed)
-```
+| Card | Content | Dimensions |
+|------|---------|------------|
+| Perspective | Week + % + Quote + CTA | 1080×1920 |
+| Achievement | Milestone + Journey + Week | 1080×1920 |
+| Year Transition | Age year + Week + Quote | 1080×1920 |
+| Wrapped | Year summary | 1080×1920 |
 
-### Animation Timings
+### The Viral Hook
 
-```
-Primary action: 250ms max
-View transition: 300ms
-Stagger: 50-100ms
-Pulse cycle: 1.2s / 2s
-Never exceed: 400ms
-```
-
-### Psychology Quick Reference
-
-| Concept | Research Source | Finite Implementation |
-|---------|-----------------|----------------------|
-| Mortality Salience | Terror Management Theory | Grid visualization, Ghost Number |
-| Fresh Start Effect | Dai, Milkman & Riis (2014) | Weekly ritual, Birthday landmarks |
-| Loss Aversion | Kahneman & Tversky (1979) | Irreversible ratings, real time scarcity |
-| Commitment Devices | Rogers et al. (2014) | Horizons feature |
-| Implementation Intentions | Gollwitzer (1999) | Sunday Ritual, specific timing |
+Every card includes:
+> **"What's your week number?"**
+> 
+> finite
 
 ---
 
@@ -2192,11 +2498,12 @@ Never exceed: 400ms
 - v2.0 — Narrative UX integration
 - v3.0 — Unified source of truth
 - v4.0 — Combined with Virality PRD, behavioral psychology, 29+ market analysis
+- v5.0 — **Share system redesign based on Spotify Wrapped psychology research. Removed Settings entry point. Added moment-based triggers. Simplified card options. Added perspective quotes.**
 
 ---
 
-*"Good design isn't just about solving surface-level pain points — it's about going deeper, redefining problems, and changing behavior."*
-
 *"The best marketing doesn't feel like marketing. It feels like sharing something meaningful."*
+
+*"What's your week number?"*
 
 *"Finite isn't about death, it's about life. The grid isn't empty weeks until you die — it's full weeks you get to design."*
