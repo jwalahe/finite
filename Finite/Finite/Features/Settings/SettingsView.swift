@@ -18,6 +18,7 @@ struct SettingsView: View {
     @State private var showBirthDateSheet: Bool = false
     @State private var showLifeExpectancySheet: Bool = false
     @State private var showEraseConfirmation: Bool = false
+    @State private var showLifeWrapped: Bool = false
 
     // Local state for notification settings (synced to user model)
     @State private var notificationsEnabled: Bool
@@ -40,6 +41,9 @@ struct SettingsView: View {
 
                     // REMINDERS
                     remindersSection
+
+                    // YOUR YEAR (Life Wrapped)
+                    yourYearSection
 
                     // DATA
                     dataSection
@@ -84,6 +88,9 @@ struct SettingsView: View {
             }
         } message: {
             Text("This will delete all your life data including phases, marked weeks, and horizons. This cannot be undone.")
+        }
+        .fullScreenCover(isPresented: $showLifeWrapped) {
+            LifeWrappedView(user: user, year: currentYear)
         }
     }
 
@@ -142,6 +149,23 @@ struct SettingsView: View {
                 user.milestoneAlertsEnabled = newValue
             }
         }
+    }
+
+    // MARK: - YOUR YEAR Section (Life Wrapped)
+
+    private var yourYearSection: some View {
+        SettingsSection(title: "YOUR YEAR") {
+            SettingsRow(
+                label: "Generate My \(currentYear)",
+                value: "Life Wrapped"
+            ) {
+                showLifeWrapped = true
+            }
+        }
+    }
+
+    private var currentYear: Int {
+        Calendar.current.component(.year, from: Date())
     }
 
     // MARK: - DATA Section

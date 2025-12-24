@@ -13,23 +13,41 @@ struct ContentView: View {
     @Query private var users: [User]
 
     @State private var shouldShowReveal: Bool? = nil  // nil = not determined yet
+    @State private var showFirstLaunchSequence: Bool = false  // SST §7.2 cinematic intro
+    @State private var pendingUser: User? = nil  // User created during onboarding, waiting for sequence
 
     var body: some View {
-        Group {
-            if let user = users.first {
-                // Existing user - use cached shouldShowReveal state
-                GridView(user: user, shouldReveal: shouldShowReveal ?? false)
-                    .onAppear {
+        ZStack {
+            Group {
+                if showFirstLaunchSequence, let user = pendingUser ?? users.first {
+                    // SST §7.2: First Launch Sequence - cinematic scale revelation
+                    FirstLaunchSequence(user: user) {
+                        // Sequence complete - transition to grid with reveal
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            showFirstLaunchSequence = false
+                            shouldShowReveal = true
+                        }
+                    }
+                    .transition(.opacity)
+                } else if let user = users.first {
+                    // Existing user - use cached shouldShowReveal state
+                    GridView(user: user, shouldReveal: shouldShowReveal ?? false)
+                        .onAppear {
+                            syncWidgetData(for: user)
+                            setupNotifications(for: user)
+                        }
+                } else {
+                    // No user - show onboarding
+                    OnboardingView { user in
+                        // New user just completed onboarding
+                        pendingUser = user
                         syncWidgetData(for: user)
                         setupNotifications(for: user)
+                        // Start the cinematic first launch sequence
+                        withAnimation(.easeIn(duration: 0.3)) {
+                            showFirstLaunchSequence = true
+                        }
                     }
-            } else {
-                // No user - show onboarding
-                OnboardingView { user in
-                    // New user just completed onboarding - they should see reveal
-                    shouldShowReveal = true
-                    syncWidgetData(for: user)
-                    setupNotifications(for: user)
                 }
             }
         }
