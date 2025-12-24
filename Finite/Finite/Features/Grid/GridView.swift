@@ -815,8 +815,7 @@ struct GridView: View {
             case .firstWeek, .ghostReveal, .quickShare:
                 PerspectiveShareSheet(user: user, triggerType: sheetType)
             case .achievement(let milestone):
-                // TODO: AchievementShareSheet (next feature)
-                PerspectiveShareSheet(user: user, triggerType: sheetType)
+                AchievementShareSheet(milestone: milestone, user: user)
             case .yearTransition:
                 // TODO: YearTransitionShareSheet
                 PerspectiveShareSheet(user: user, triggerType: sheetType)
@@ -876,6 +875,8 @@ struct GridView: View {
                     milestone.complete(atWeek: user.currentWeekNumber)
                     HapticService.shared.success()
                     selectedMilestone = nil
+                    // SST §18.3: Trigger share prompt after milestone completion
+                    shareFlow.onMilestoneCompleted(milestone)
                 }
             )
         }
