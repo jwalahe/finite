@@ -108,7 +108,7 @@ struct WrappedShareSheet: View {
                 .padding(.vertical, 24)
             }
             .background(Color.bgPrimary)
-            .navigationTitle("Share \(year)")
+            .navigationTitle("Share \(String(year))")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
