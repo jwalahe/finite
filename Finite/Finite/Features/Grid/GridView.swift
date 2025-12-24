@@ -82,9 +82,6 @@ struct GridView: View {
     // Settings sheet
     @State private var showSettings: Bool = false
 
-    // Share Week sheet (Week Card viral feature)
-    @State private var showShareWeekSheet: Bool = false
-
     // Phase prompt and builder
     @State private var showPhasePrompt: Bool = false
     @State private var showPhaseBuilder: Bool = false
@@ -818,9 +815,6 @@ struct GridView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView(user: user)
-        }
-        .sheet(isPresented: $showShareWeekSheet) {
-            ShareWeekSheet(user: user)
         }
         // SST §18: Viral share sheets triggered by emotional moments
         .sheet(item: $shareFlow.activeSheet) { sheetType in

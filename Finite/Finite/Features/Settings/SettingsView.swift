@@ -18,7 +18,6 @@ struct SettingsView: View {
     @State private var showBirthDateSheet: Bool = false
     @State private var showLifeExpectancySheet: Bool = false
     @State private var showEraseConfirmation: Bool = false
-    @State private var showShareWeekSheet: Bool = false
 
     // Local state for notification settings (synced to user model)
     @State private var notificationsEnabled: Bool
@@ -38,9 +37,6 @@ struct SettingsView: View {
                 VStack(spacing: 32) {
                     // YOUR LIFE
                     yourLifeSection
-
-                    // SHARE
-                    shareSection
 
                     // REMINDERS
                     remindersSection
@@ -89,9 +85,6 @@ struct SettingsView: View {
         } message: {
             Text("This will delete all your life data including phases, marked weeks, and horizons. This cannot be undone.")
         }
-        .sheet(isPresented: $showShareWeekSheet) {
-            ShareWeekSheet(user: user)
-        }
     }
 
     // MARK: - YOUR LIFE Section
@@ -112,20 +105,6 @@ struct SettingsView: View {
                 value: "\(user.lifeExpectancy) years"
             ) {
                 showLifeExpectancySheet = true
-            }
-        }
-    }
-
-    // MARK: - SHARE Section
-
-    private var shareSection: some View {
-        SettingsSection(title: "SHARE") {
-            SettingsActionRow(
-                icon: "square.and.arrow.up",
-                label: "Share My Week",
-                subtitle: "Week \(user.currentWeekNumber.formatted())"
-            ) {
-                showShareWeekSheet = true
             }
         }
     }
