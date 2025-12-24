@@ -732,6 +732,8 @@ struct GridView: View {
                 startRevealAnimation()
             } else {
                 hasRevealCompleted = true
+                // SST §18.5: Check for birthday week (only if not doing reveal)
+                checkBirthdayWeek()
             }
             // Initial cache build
             rebuildRatedWeeksCache()
@@ -748,6 +750,17 @@ struct GridView: View {
             // Rebuild cache when weeks added/deleted
             rebuildRatedWeeksCache()
             rebuildGridColorsCache()
+        }
+        .onChange(of: user.birthDate) { _, _ in
+            // SST §18.5: Re-check birthday week when user changes birthday in Settings
+            checkBirthdayWeek()
+        }
+        .onChange(of: walkthrough.isActive) { wasActive, isActive in
+            // SST §18.5: Check birthday week after walkthrough completes
+            // Only trigger when walkthrough transitions from active to inactive
+            if wasActive && !isActive {
+                checkBirthdayWeek()
+            }
         }
         .onChange(of: weeks.map { "\($0.weekNumber)-\($0.rating ?? 0)" }) { _, _ in
             // Rebuild cache when any week's rating is updated
@@ -816,9 +829,8 @@ struct GridView: View {
                 PerspectiveShareSheet(user: user, triggerType: sheetType)
             case .achievement(let milestone):
                 AchievementShareSheet(milestone: milestone, user: user)
-            case .yearTransition:
-                // TODO: YearTransitionShareSheet
-                PerspectiveShareSheet(user: user, triggerType: sheetType)
+            case .yearTransition(let age):
+                YearTransitionShareSheet(user: user, age: age)
             }
         }
         .sheet(isPresented: $showPhaseBuilder) {
@@ -2128,6 +2140,18 @@ struct GridView: View {
             // No phase at current week - use subtle default
             currentAuraColor = Color.gridFilled.opacity(0.5)
         }
+    }
+
+    // MARK: - Birthday Week Detection
+
+    /// SST §18.5: Check if current week is user's birthday week and trigger share prompt
+    private func checkBirthdayWeek() {
+        // Don't trigger during walkthrough - let user complete onboarding first
+        guard !walkthrough.isActive else { return }
+        guard ShareFlowController.isBirthdayWeek(birthDate: user.birthDate) else { return }
+
+        let age = ShareFlowController.currentAge(birthDate: user.birthDate)
+        shareFlow.onBirthdayWeekDetected(age: age)
     }
 
     // MARK: - Week Confirm Bloom Animation

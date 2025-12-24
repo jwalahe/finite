@@ -182,15 +182,17 @@ final class ShareFlowController: ObservableObject {
 
     /// Check if current week is user's birthday week
     /// SST §18.5 Detection logic
-    static func isBirthdayWeek(birthDate: Date, currentWeekNumber: Int) -> Bool {
+    /// Birthday week = TODAY's week of year matches the week of year when user was born
+    static func isBirthdayWeek(birthDate: Date) -> Bool {
         let calendar = Calendar.current
+
+        // Get the week of year for the birth date (1-52)
         let birthWeekOfYear = calendar.component(.weekOfYear, from: birthDate)
-        let currentWeekOfYear = currentWeekNumber % 52
 
-        // Handle week 0 edge case
-        let normalizedCurrentWeek = currentWeekOfYear == 0 ? 52 : currentWeekOfYear
+        // Get TODAY's week of year (not the user's week number in life)
+        let todayWeekOfYear = calendar.component(.weekOfYear, from: Date())
 
-        return birthWeekOfYear == normalizedCurrentWeek
+        return birthWeekOfYear == todayWeekOfYear
     }
 
     /// Get user's current age (for year transition cards)
