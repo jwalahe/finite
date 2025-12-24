@@ -50,6 +50,10 @@ struct GhostNumber: View {
             isSummoned = true
         }
 
+        // SST §18.4: Trigger share prompt on first ghost reveal
+        // "Mortality salience at peak. Powerful share moment."
+        ShareFlowController.shared.onGhostNumberRevealed()
+
         summonTask = Task {
             try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
 
