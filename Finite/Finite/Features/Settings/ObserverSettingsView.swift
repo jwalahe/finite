@@ -144,32 +144,67 @@ struct ObserverSettingsView: View {
     // MARK: - Preview Section
 
     private var previewSection: some View {
-        Button {
-            if !voice.isSpeaking {
-                voice.speakPreview()
-                HapticService.shared.medium()
-            }
-        } label: {
-            HStack {
-                if voice.isSpeaking {
-                    ProgressView()
-                        .tint(Color.textSecondary)
-                } else {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 12))
+        VStack(spacing: 12) {
+            Button {
+                if !voice.isSpeaking {
+                    voice.speakPreview()
+                    HapticService.shared.medium()
                 }
+            } label: {
+                HStack {
+                    if voice.isSpeaking {
+                        ProgressView()
+                            .tint(Color.textSecondary)
+                    } else {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 12))
+                    }
 
-                Text(voice.isSpeaking ? "Speaking..." : "Hear a preview")
-                    .font(.subheadline)
+                    Text(voice.isSpeaking ? "Speaking..." : "Hear a preview")
+                        .font(.subheadline)
+                }
+                .foregroundStyle(Color.textSecondary)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity)
+                .background(Color.bgSecondary)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .foregroundStyle(Color.textSecondary)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 14)
-            .frame(maxWidth: .infinity)
-            .background(Color.bgSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .disabled(voice.isSpeaking)
+
+            // Voice quality indicator
+            voiceQualityInfo
         }
-        .disabled(voice.isSpeaking)
+    }
+
+    // MARK: - Voice Quality Info
+
+    private var voiceQualityInfo: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 6) {
+                Text("Voice:")
+                    .font(.caption)
+                    .foregroundStyle(Color.textTertiary)
+
+                Text(voice.selectedVoiceName)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Color.textSecondary)
+
+                if voice.hasEnhancedVoice {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.caption2)
+                        .foregroundStyle(Color.green.opacity(0.8))
+                }
+            }
+
+            if !voice.hasEnhancedVoice {
+                Text("For better voice quality, download enhanced voices in Settings → Accessibility → Spoken Content → Voices")
+                    .font(.caption2)
+                    .foregroundStyle(Color.textTertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+            }
+        }
     }
 }
 
