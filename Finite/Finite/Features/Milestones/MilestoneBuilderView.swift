@@ -245,17 +245,62 @@ struct MilestoneBuilderView: View {
             modelContext.insert(milestone)
             onSave?(milestone)
 
+            // Death Voice: Trigger for milestone creation
+            triggerDeathVoiceForCreation(milestoneName: trimmedName)
+
         case .edit(let existingMilestone):
+            let oldWeekNumber = existingMilestone.targetWeekNumber
             existingMilestone.name = trimmedName
             existingMilestone.targetWeekNumber = targetWeekNumber
             existingMilestone.category = category
             existingMilestone.notes = notes.isEmpty ? nil : notes
             existingMilestone.updatedAt = Date()
             onSave?(existingMilestone)
+
+            // Death Voice: Trigger for milestone moved (if week changed significantly)
+            let weekDifference = targetWeekNumber - oldWeekNumber
+            if abs(weekDifference) >= 4 {
+                triggerDeathVoiceForMove(milestoneName: trimmedName, weekDifference: weekDifference)
+            }
         }
 
         HapticService.shared.success()
         dismiss()
+    }
+
+    /// Death Voice trigger for milestone creation
+    private func triggerDeathVoiceForCreation(milestoneName: String) {
+        let controller = DeathVoiceController.shared
+
+        // Get current milestone count (approximate - will be updated after save)
+        let milestoneCount = (try? modelContext.fetchCount(FetchDescriptor<Milestone>())) ?? 1
+
+        if milestoneCount == 1 {
+            // First milestone ever
+            controller.onEvent(DeathTrigger(
+                type: .firstMilestoneEver,
+                context: DeathTrigger.Context(userName: "Traveler", milestoneName: milestoneName)
+            ))
+        } else if controller.shouldSpeakForMilestoneCount(milestoneCount) {
+            // Subsequent milestone (sparse)
+            controller.onEvent(DeathTrigger(
+                type: .milestoneCreated,
+                context: DeathTrigger.Context(userName: "Traveler", milestoneCount: milestoneCount)
+            ))
+        }
+    }
+
+    /// Death Voice trigger for milestone moved
+    private func triggerDeathVoiceForMove(milestoneName: String, weekDifference: Int) {
+        let controller = DeathVoiceController.shared
+        controller.onEvent(DeathTrigger(
+            type: .milestoneMoved,
+            context: DeathTrigger.Context(
+                userName: "Traveler",
+                milestoneName: milestoneName,
+                weeksAway: weekDifference > 0 ? weekDifference : nil
+            )
+        ))
     }
 }
 

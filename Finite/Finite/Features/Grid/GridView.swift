@@ -125,6 +125,9 @@ struct GridView: View {
     // Share flow controller (SST §19 viral triggers)
     @StateObject private var shareFlow = ShareFlowController.shared
 
+    // Death Voice controller (The Observer)
+    @StateObject private var deathVoice = DeathVoiceController.shared
+
     @State private var gridFrameForWalkthrough: CGRect = .zero
     @State private var currentWeekFrameForWalkthrough: CGRect = .zero
     @State private var dotIndicatorFrameForWalkthrough: CGRect = .zero
@@ -883,6 +886,11 @@ struct GridView: View {
                     selectedMilestone = nil
                     // SST §18.3: Trigger share prompt after milestone completion
                     shareFlow.onMilestoneCompleted(milestone)
+                    // Death Voice: Trigger for milestone completion
+                    deathVoice.onEvent(DeathTrigger(
+                        type: .milestoneCompleted,
+                        context: DeathTrigger.Context(userName: "Traveler", milestoneName: milestone.name)
+                    ))
                 }
             )
         }
@@ -2005,6 +2013,12 @@ struct GridView: View {
         user.currentViewMode = currentViewMode
         rebuildGridColorsCache()
         flashModeLabel()
+
+        // Death Voice: Check triggers when entering Horizons
+        if currentViewMode == .horizons {
+            deathVoice.onViewAppear()
+            checkDeathVoiceTriggers()
+        }
     }
 
     private func swipeToNextMode() {
@@ -2036,6 +2050,12 @@ struct GridView: View {
 
         // Notify walkthrough of view mode change
         walkthrough.handleViewModeChanged(to: currentViewMode)
+
+        // Death Voice: Check triggers when entering Horizons
+        if currentViewMode == .horizons {
+            deathVoice.onViewAppear()
+            checkDeathVoiceTriggers()
+        }
     }
 
     private func swipeToPreviousMode() {
@@ -2052,6 +2072,12 @@ struct GridView: View {
 
         // Notify walkthrough of view mode change
         walkthrough.handleViewModeChanged(to: currentViewMode)
+
+        // Death Voice: Check triggers when entering Horizons
+        if currentViewMode == .horizons {
+            deathVoice.onViewAppear()
+            checkDeathVoiceTriggers()
+        }
     }
 
     /// Execute signature view mode transition with choreographed animations
@@ -2146,6 +2172,55 @@ struct GridView: View {
 
         let age = ShareFlowController.currentAge(birthDate: user.birthDate)
         shareFlow.onBirthdayWeekDetected(age: age)
+    }
+
+    // MARK: - Death Voice Triggers
+
+    /// Check and trigger Death Voice events when entering Horizons mode
+    private func checkDeathVoiceTriggers() {
+        guard deathVoice.isEnabled else { return }
+        guard currentViewMode == .horizons else { return }
+        guard !walkthrough.isActive else { return }
+
+        let context = DeathTrigger.Context(userName: "Traveler") // Could use user's name if stored
+
+        // Check for return after absence (3+ weeks)
+        if let weeksSince = deathVoice.weeksSinceLastVisit(), weeksSince >= 3 {
+            deathVoice.onEvent(DeathTrigger(
+                type: .returnsAfterAbsence,
+                context: DeathTrigger.Context(userName: context.userName, weeksMissed: weeksSince)
+            ))
+        }
+
+        // Check for overdue milestones
+        let overdueMilestones = allMilestones.filter {
+            !$0.isCompleted && $0.targetWeekNumber < currentWeekNumber
+        }
+
+        if overdueMilestones.count >= 3 {
+            // Multiple overdue - pattern detected
+            deathVoice.onEvent(DeathTrigger(
+                type: .multipleOverdue,
+                context: DeathTrigger.Context(userName: context.userName, overdueCount: overdueMilestones.count)
+            ))
+        } else if let mostRecentOverdue = overdueMilestones.sorted(by: { $0.targetWeekNumber > $1.targetWeekNumber }).first {
+            // Single overdue milestone (most recently passed)
+            deathVoice.onEvent(DeathTrigger(
+                type: .milestoneOverdue,
+                context: DeathTrigger.Context(userName: context.userName, milestoneName: mostRecentOverdue.name)
+            ))
+        }
+
+        // Check for empty state (no milestones)
+        if milestones.isEmpty && deathVoice.shouldSpeakForEmptyState() {
+            deathVoice.onEvent(DeathTrigger(
+                type: .noMilestonesExist,
+                context: context
+            ))
+        }
+
+        // Update visit timestamp
+        deathVoice.updateHorizonsVisit()
     }
 
     // MARK: - Week Confirm Bloom Animation
