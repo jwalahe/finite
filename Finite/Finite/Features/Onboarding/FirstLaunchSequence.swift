@@ -30,6 +30,9 @@ struct FirstLaunchSequence: View {
     @State private var labelOpacity: Double = 0
     @State private var currentLabel: String = ""
     @State private var isComplete = false
+    @State private var singleDotOpacity: Double = 0
+    @State private var rowOpacity: Double = 0
+    @State private var dotToRowTransition: Bool = false
 
     enum SequencePhase {
         case blackScreen
@@ -53,22 +56,25 @@ struct FirstLaunchSequence: View {
             Color.black
                 .ignoresSafeArea()
 
-            // Content layers
-            switch phase {
-            case .blackScreen:
-                EmptyView()
+            // Content layers - using ZStack for crossfade transitions
+            Group {
+                switch phase {
+                case .blackScreen:
+                    EmptyView()
 
-            case .titleIn, .titleHold, .titleOut:
-                titleView
+                case .titleIn, .titleHold, .titleOut:
+                    titleView
 
-            case .singleDot:
-                singleDotView
+                case .singleDot, .rowExpand:
+                    // Both views present, opacity controlled separately for crossfade
+                    ZStack {
+                        singleDotView
+                        rowExpandView
+                    }
 
-            case .rowExpand:
-                rowExpandView
-
-            case .fullGrid, .settle:
-                fullGridView
+                case .fullGrid, .settle:
+                    fullGridView
+                }
             }
         }
         .onAppear {
@@ -100,27 +106,45 @@ struct FirstLaunchSequence: View {
                 .foregroundStyle(.white.opacity(0.8))
                 .opacity(labelOpacity)
         }
+        .opacity(singleDotOpacity)
     }
 
     // MARK: - Row Expand View
 
     private var rowExpandView: some View {
-        VStack(spacing: 24) {
-            // 52 dots representing one year
-            HStack(spacing: 4) {
-                ForEach(0..<52, id: \.self) { _ in
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 6, height: 6)
-                }
-            }
-            .scaleEffect(rowScale)
+        GeometryReader { geometry in
+            let screenWidth = geometry.size.width
+            // Calculate dot size to fit 52 dots with spacing within screen width
+            // Formula: 52 * dotSize + 51 * spacing = screenWidth - padding
+            let availableWidth = screenWidth - 48 // 24pt padding on each side
+            let spacing: CGFloat = 2
+            let dotSize = (availableWidth - (51 * spacing)) / 52
 
-            Text(currentLabel)
-                .font(.system(size: 17, weight: .light))
-                .foregroundStyle(.white.opacity(0.8))
-                .opacity(labelOpacity)
+            VStack(spacing: 24) {
+                // 52 dots representing one year
+                HStack(spacing: spacing) {
+                    ForEach(0..<52, id: \.self) { index in
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: dotSize, height: dotSize)
+                            .scaleEffect(rowScale)
+                            .animation(
+                                .spring(response: 0.4, dampingFraction: 0.7)
+                                    .delay(Double(index) * 0.01),
+                                value: rowScale
+                            )
+                    }
+                }
+                .padding(.horizontal, 24)
+
+                Text(currentLabel)
+                    .font(.system(size: 17, weight: .light))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .opacity(labelOpacity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .opacity(rowOpacity)
     }
 
     // MARK: - Full Grid View
@@ -218,6 +242,8 @@ struct FirstLaunchSequence: View {
     private func startSingleDotPhase() {
         phase = .singleDot
         currentLabel = "This is one week."
+        singleDotOpacity = 1.0
+        rowOpacity = 0
 
         // Dot appears with spring
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
@@ -231,7 +257,7 @@ struct FirstLaunchSequence: View {
             }
         }
 
-        // Hold for 1.5s
+        // Hold for 1.5s then transition to row
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
             withAnimation(.easeOut(duration: 0.2)) {
                 labelOpacity = 0
@@ -247,13 +273,19 @@ struct FirstLaunchSequence: View {
         phase = .rowExpand
         currentLabel = "This is one year."
 
-        // Row expands
+        // Crossfade: single dot fades out, row fades in
+        withAnimation(.easeInOut(duration: 0.4)) {
+            singleDotOpacity = 0
+            rowOpacity = 1.0
+        }
+
+        // Row dots expand (staggered animation per dot)
         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
             rowScale = 1.0
         }
 
         // Label fades in
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             withAnimation(.easeIn(duration: 0.3)) {
                 labelOpacity = 1.0
             }
@@ -262,10 +294,11 @@ struct FirstLaunchSequence: View {
         // Haptic tick for "year"
         HapticService.shared.medium()
 
-        // Hold for 1.2s
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        // Hold for 1.5s
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             withAnimation(.easeOut(duration: 0.2)) {
                 labelOpacity = 0
+                rowOpacity = 0
             }
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
