@@ -19,7 +19,6 @@ struct SettingsView: View {
     @State private var showLifeExpectancySheet: Bool = false
     @State private var showEraseConfirmation: Bool = false
     @State private var showLifeWrapped: Bool = false
-    @State private var showObserverSettings: Bool = false
 
     // Local state for notification settings (synced to user model)
     @State private var notificationsEnabled: Bool
@@ -42,9 +41,6 @@ struct SettingsView: View {
 
                     // REMINDERS
                     remindersSection
-
-                    // THE OBSERVER (Death Voice)
-                    observerSection
 
                     // YOUR YEAR (Life Wrapped)
                     yourYearSection
@@ -95,9 +91,6 @@ struct SettingsView: View {
         }
         .fullScreenCover(isPresented: $showLifeWrapped) {
             LifeWrappedView(user: user, year: currentYear)
-        }
-        .sheet(isPresented: $showObserverSettings) {
-            ObserverSettingsView()
         }
     }
 
@@ -155,50 +148,6 @@ struct SettingsView: View {
             ) { newValue in
                 user.milestoneAlertsEnabled = newValue
             }
-        }
-    }
-
-    // MARK: - THE OBSERVER Section (Death Voice)
-
-    private var observerSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Custom header for The Observer
-            VStack(alignment: .leading, spacing: 2) {
-                Text("THE OBSERVER")
-                    .font(.caption)
-                    .textCase(.uppercase)
-                    .foregroundStyle(Color.textTertiary)
-                    .tracking(2)
-
-                Text("A presence that notices")
-                    .font(.system(size: 11))
-                    .italic()
-                    .foregroundStyle(Color.textTertiary.opacity(0.7))
-            }
-            .padding(.bottom, 12)
-
-            VStack(spacing: 0) {
-                SettingsToggleRow(
-                    label: "Enable Voice",
-                    isOn: Binding(
-                        get: { DeathVoiceController.shared.isEnabled },
-                        set: { DeathVoiceController.shared.isEnabled = $0 }
-                    )
-                )
-
-                if DeathVoiceController.shared.isEnabled {
-                    SettingsDivider()
-
-                    SettingsRow(
-                        label: "Configure",
-                        value: DeathVoiceController.shared.frequency.displayName
-                    ) {
-                        showObserverSettings = true
-                    }
-                }
-            }
-            .background(Color.bgSecondary.opacity(0.8))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
 
